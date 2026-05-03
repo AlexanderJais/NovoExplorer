@@ -426,7 +426,7 @@ def get_significant_genes(
     mask = (deg_df["padj"] <= padj_threshold) & (deg_df["log2fc"].abs() >= log2fc_threshold)
     sig = deg_df.loc[mask].copy()
     logger.info(
-        "Significant genes: %d / %d (padj < %g, |log2fc| > %g)",
+        "Significant genes: %d / %d (padj <= %g, |log2fc| >= %g)",
         len(sig),
         len(deg_df),
         padj_threshold,

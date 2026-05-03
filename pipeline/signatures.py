@@ -145,10 +145,10 @@ def run_preranked_gsea(
         }).reset_index(drop=True)
 
         logger.info(
-            "GSEA complete for '%s': %d terms evaluated, %d with FDR < 0.25.",
+            "GSEA complete for '%s': %d terms evaluated, %d with FDR <= 0.25.",
             gene_set_db,
             len(summary),
-            (summary["fdr"] < 0.25).sum(),
+            (summary["fdr"] <= 0.25).sum(),
         )
         return res, summary
 
@@ -230,10 +230,10 @@ def run_ora(
         }).reset_index(drop=True)
 
         logger.info(
-            "ORA complete for '%s': %d terms, %d with FDR < 0.05.",
+            "ORA complete for '%s': %d terms, %d with FDR <= 0.05.",
             gene_set_db,
             len(summary),
-            (summary["fdr"] < 0.05).sum(),
+            (summary["fdr"] <= 0.05).sum(),
         )
         return summary
 
@@ -372,7 +372,7 @@ def compute_signature_overlap(
 
     For each pair of comparisons the Jaccard index is calculated as
     ``|A & B| / |A | B|`` where *A* and *B* are the sets of genes with
-    ``padj < padj_threshold``.
+    ``padj <= padj_threshold``.
 
     Parameters
     ----------
@@ -398,7 +398,7 @@ def compute_signature_overlap(
 
         if "padj" in df.columns and gene_col in df.columns:
             sig_genes = set(
-                df.loc[df["padj"] < padj_threshold, gene_col].dropna().unique()
+                df.loc[df["padj"] <= padj_threshold, gene_col].dropna().unique()
             )
         else:
             sig_genes = set()
@@ -466,7 +466,7 @@ def find_core_signatures(
                 continue
 
             sig_terms = gsea_df.loc[
-                gsea_df["fdr"] < padj_threshold, "term"
+                gsea_df["fdr"] <= padj_threshold, "term"
             ].dropna().unique()
 
             for term in sig_terms:
@@ -529,7 +529,7 @@ def find_unique_signatures(
                 continue
 
             sig_terms = gsea_df.loc[
-                gsea_df["fdr"] < padj_threshold, "term"
+                gsea_df["fdr"] <= padj_threshold, "term"
             ].dropna().unique()
 
             for term in sig_terms:

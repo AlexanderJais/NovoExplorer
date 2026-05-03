@@ -73,7 +73,7 @@ def _get_sig_genes(
         if "padj" not in df.columns or "log2fc" not in df.columns:
             continue
 
-        sig = df[(df["padj"] < padj_thresh) & (df["log2fc"].abs() > log2fc_thresh)]
+        sig = df[(df["padj"] <= padj_thresh) & (df["log2fc"].abs() >= log2fc_thresh)]
 
         # Determine gene name column
         gene_col = None
@@ -243,8 +243,8 @@ def _build_fc_scatter_data(
 
     # Classify concordance
     def _classify(row):
-        sig_a = row.get("padj_a", 1.0) < padj_thresh and abs(row["log2fc_a"]) > log2fc_thresh
-        sig_b = row.get("padj_b", 1.0) < padj_thresh and abs(row["log2fc_b"]) > log2fc_thresh
+        sig_a = row.get("padj_a", 1.0) <= padj_thresh and abs(row["log2fc_a"]) >= log2fc_thresh
+        sig_b = row.get("padj_b", 1.0) <= padj_thresh and abs(row["log2fc_b"]) >= log2fc_thresh
 
         if sig_a and sig_b:
             if row["log2fc_a"] > 0 and row["log2fc_b"] > 0:
@@ -380,7 +380,7 @@ def _build_summary_table(
         for comp, vals in comp_vals.items():
             padj = vals.get("padj", 1.0)
             lfc = abs(vals.get("log2fc", 0.0))
-            if not np.isnan(padj) and padj < padj_thresh and lfc > log2fc_thresh:
+            if not np.isnan(padj) and padj <= padj_thresh and lfc >= log2fc_thresh:
                 sig_genes.add(gene)
                 break
 
@@ -404,7 +404,7 @@ def _style_log2fc_cell(val, padj_val, padj_thresh, log2fc_thresh):
     """Return CSS style string for a log2FC cell."""
     if pd.isna(val) or pd.isna(padj_val):
         return "color: #BBBBBB; background-color: #F9F9F9;"
-    if padj_val < padj_thresh and abs(val) > log2fc_thresh:
+    if padj_val <= padj_thresh and abs(val) >= log2fc_thresh:
         if val > 0:
             return f"color: white; background-color: {_VERMILION}; font-weight: 600;"
         else:
@@ -564,8 +564,8 @@ def main() -> None:
     # ==================================================================
     with tab_summary:
         st.caption(
-            f"Log2 fold-change per comparison for genes significant (padj < {padj_thresh}, "
-            f"|log2FC| > {log2fc_thresh}) in at least one comparison. "
+            f"Log2 fold-change per comparison for genes significant (padj <= {padj_thresh}, "
+            f"|log2FC| >= {log2fc_thresh}) in at least one comparison. "
             "Cells are colored: vermilion = significantly up, "
             "blue = significantly down, gray = not significant. "
             "Adjust sidebar thresholds to change filtering."
@@ -603,7 +603,7 @@ def main() -> None:
                     style = _style_log2fc_cell(val, padj_val, padj_thresh, log2fc_thresh)
                     if pd.notna(val):
                         # Add directional arrow for accessibility (colorblind-friendly)
-                        is_sig = pd.notna(padj_val) and padj_val < padj_thresh and abs(val) > log2fc_thresh
+                        is_sig = pd.notna(padj_val) and padj_val <= padj_thresh and abs(val) >= log2fc_thresh
                         if is_sig and val > 0:
                             display_val = f"&uarr; {val:.2f}"
                         elif is_sig and val < 0:

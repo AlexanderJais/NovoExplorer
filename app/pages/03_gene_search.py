@@ -190,7 +190,7 @@ def _get_gene_info(
                 continue
             if not match.empty and "padj" in match.columns:
                 row = match.iloc[0]
-                if row["padj"] < 0.05:
+                if row["padj"] <= 0.05:
                     direction = "up" if row.get("log2fc", 0) > 0 else "down"
                     deg_hits.append(f"{comp_name} ({direction})")
         if deg_hits:

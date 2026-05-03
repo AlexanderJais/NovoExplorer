@@ -157,7 +157,7 @@ def main() -> None:
                 total_degs += int((df["regulation"] != "ns").sum())
             elif "padj" in df.columns and "log2fc" in df.columns:
                 total_degs += int(
-                    ((df["padj"] < 0.05) & (df["log2fc"].abs() > 1.0)).sum()
+                    ((df["padj"] <= 0.05) & (df["log2fc"].abs() >= 1.0)).sum()
                 )
 
     col1, col2, col3, col4 = st.columns(4)
@@ -168,7 +168,7 @@ def main() -> None:
     st.caption(
         f"Experiment summary: {n_samples} samples, {n_genes:,} measured genes, "
         f"{n_comparisons} differential expression comparisons. "
-        f"Total DEGs counted at default thresholds (padj < 0.05, |log2FC| > 1)."
+        f"Total DEGs counted at default thresholds (padj <= 0.05, |log2FC| >= 1)."
     )
 
     st.divider()
@@ -293,8 +293,8 @@ def main() -> None:
             for comp_name, df in sorted(deg_all.items()):
                 if "padj" not in df.columns or "log2fc" not in df.columns:
                     continue
-                sig_mask = (df["padj"] < padj_thresh) & (
-                    df["log2fc"].abs() > log2fc_thresh
+                sig_mask = (df["padj"] <= padj_thresh) & (
+                    df["log2fc"].abs() >= log2fc_thresh
                 )
                 sig = df.loc[sig_mask]
                 if "regulation" in sig.columns:

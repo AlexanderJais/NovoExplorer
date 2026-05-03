@@ -571,7 +571,7 @@ with tab_gene:
                 gene_df = pd.DataFrame(rows)
 
                 # Bar chart: log2FC across comparisons
-                gene_df["significant"] = gene_df["padj"] < padj_thresh
+                gene_df["significant"] = gene_df["padj"] <= padj_thresh
                 gene_df["color"] = gene_df.apply(
                     lambda r: UP_COLOR if r["significant"] and r["log2FC"] > 0
                     else (DOWN_COLOR if r["significant"] and r["log2FC"] < 0 else NS_COLOR),
@@ -702,7 +702,7 @@ with tab_comparison:
             df_plot = comp_df.dropna(subset=["log2fc", "padj"]).copy()
             df_plot["neg_log10_padj"] = -np.log10(df_plot["padj"].clip(lower=1e-300))
 
-            sig = df_plot["padj"] < padj_t
+            sig = df_plot["padj"] <= padj_t
             up = sig & (df_plot["log2fc"] >= fc_t)
             down = sig & (df_plot["log2fc"] <= -fc_t)
             df_plot["category"] = "ns"
@@ -768,7 +768,7 @@ with tab_comparison:
 
         display = comp_df.copy()
         if show_sig_only and has_cols:
-            display = display[(display["padj"] < padj_t) & (display["log2fc"].abs() >= fc_t)]
+            display = display[(display["padj"] <= padj_t) & (display["log2fc"].abs() >= fc_t)]
         if gene_filter and "gene_name" in display.columns:
             display = display[display["gene_name"].str.contains(gene_filter, case=False, na=False)]
 
@@ -809,11 +809,11 @@ with tab_enrichment:
 
             # Filter significant
             if "padj" in enrich_df.columns:
-                sig_df = enrich_df[enrich_df["padj"] < enrich_padj].copy()
+                sig_df = enrich_df[enrich_df["padj"] <= enrich_padj].copy()
             else:
                 sig_df = enrich_df.copy()
 
-            st.caption(f"{len(sig_df)} significant terms (padj < {enrich_padj})")
+            st.caption(f"{len(sig_df)} significant terms (padj <= {enrich_padj})")
 
             if sig_df.empty:
                 st.info("No significant enrichment terms at this threshold.")
@@ -1015,7 +1015,7 @@ with tab_ma:
             ma_plot = ma_df.dropna(subset=["log2fc", "padj", "basemean"]).copy()
             ma_plot["log10_basemean"] = np.log10(ma_plot["basemean"].clip(lower=1e-1))
 
-            sig = ma_plot["padj"] < ma_padj
+            sig = ma_plot["padj"] <= ma_padj
             up = sig & (ma_plot["log2fc"] >= ma_fc)
             down = sig & (ma_plot["log2fc"] <= -ma_fc)
             ma_plot["category"] = "ns"
@@ -1091,7 +1091,7 @@ with tab_venn:
                 df = deg[comp]
                 if not {"log2fc", "padj", "gene_name"}.issubset(set(df.columns)):
                     continue
-                sig_mask = df["padj"] < venn_padj
+                sig_mask = df["padj"] <= venn_padj
                 if venn_direction == "All significant":
                     sig_mask &= df["log2fc"].abs() >= venn_fc
                 elif venn_direction == "Upregulated only":
@@ -1195,7 +1195,7 @@ with tab_ranked:
 
             ranked = ranked.reset_index(drop=True)
             ranked["rank"] = range(1, len(ranked) + 1)
-            ranked["significant"] = ranked["padj"] < rank_padj
+            ranked["significant"] = ranked["padj"] <= rank_padj
 
             # Waterfall-style plot: rank vs log2FC
             fig = go.Figure()
@@ -1363,7 +1363,7 @@ with tab_pathway:
                 # Filter to significant
                 pw_padj_thresh = st.slider("padj threshold", 0.001, 0.5, 0.05, 0.005, key="pw_padj")
                 if "padj" in pw_df.columns:
-                    pw_sig = pw_df[pw_df["padj"] < pw_padj_thresh]
+                    pw_sig = pw_df[pw_df["padj"] <= pw_padj_thresh]
                 else:
                     pw_sig = pw_df
 
@@ -1781,7 +1781,7 @@ with tab_export:
                 for comp_name in sorted(deg.keys()):
                     df = deg[comp_name].copy()
                     if sig_only and {"log2fc", "padj"}.issubset(set(df.columns)):
-                        df = df[(df["padj"] < export_padj) & (df["log2fc"].abs() >= export_fc)]
+                        df = df[(df["padj"] <= export_padj) & (df["log2fc"].abs() >= export_fc)]
                     sheet_name = _unique_sheet_name(comp_name)
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
 
@@ -1790,7 +1790,7 @@ with tab_export:
                     for db_name, db_df in comp_data.items():
                         edf = standardize_enrichment_columns(db_df.copy())
                         if sig_only and "padj" in edf.columns:
-                            edf = edf[edf["padj"] < export_padj]
+                            edf = edf[edf["padj"] <= export_padj]
                         sheet_name = _unique_sheet_name(f"{comp_name[:20]}_{db_name}")
                         edf.to_excel(writer, sheet_name=sheet_name, index=False)
 
@@ -1814,7 +1814,7 @@ with tab_export:
                 for comp_name in sorted(deg.keys()):
                     df = deg[comp_name].copy()
                     if sig_only and {"log2fc", "padj"}.issubset(set(df.columns)):
-                        df = df[(df["padj"] < export_padj) & (df["log2fc"].abs() >= export_fc)]
+                        df = df[(df["padj"] <= export_padj) & (df["log2fc"].abs() >= export_fc)]
                     csv_buf = io.StringIO()
                     df.to_csv(csv_buf, index=False)
                     zf.writestr(f"deg/{comp_name}.csv", csv_buf.getvalue())
@@ -1823,7 +1823,7 @@ with tab_export:
                     for db_name, db_df in comp_data.items():
                         edf = standardize_enrichment_columns(db_df.copy())
                         if sig_only and "padj" in edf.columns:
-                            edf = edf[edf["padj"] < export_padj]
+                            edf = edf[edf["padj"] <= export_padj]
                         csv_buf = io.StringIO()
                         edf.to_csv(csv_buf, index=False)
                         zf.writestr(f"enrichment/{comp_name}_{db_name}.csv", csv_buf.getvalue())

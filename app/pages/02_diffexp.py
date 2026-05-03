@@ -321,14 +321,14 @@ def main() -> None:
     # Compute regulation column BEFORE filtering so indices stay aligned
     if "regulation" not in table_df.columns and "padj" in table_df.columns and "log2fc" in table_df.columns:
         table_df["regulation"] = "ns"
-        sig = table_df["padj"] < padj_thresh
+        sig = table_df["padj"] <= padj_thresh
         table_df.loc[sig & (table_df["log2fc"] >= log2fc_thresh), "regulation"] = "up"
         table_df.loc[sig & (table_df["log2fc"] <= -log2fc_thresh), "regulation"] = "down"
 
     # Filter to significant genes, then sort by padj
     if "padj" in table_df.columns and "log2fc" in table_df.columns:
-        sig_mask = (table_df["padj"] < padj_thresh) & (
-            table_df["log2fc"].abs() > log2fc_thresh
+        sig_mask = (table_df["padj"] <= padj_thresh) & (
+            table_df["log2fc"].abs() >= log2fc_thresh
         )
         table_df = table_df.loc[sig_mask]
 
@@ -358,8 +358,8 @@ def main() -> None:
             table_df = table_df[table_df["regulation"] == reg_filter]
 
     st.caption(
-        f"{len(table_df)} significant genes at padj < {padj_thresh}, "
-        f"|log2FC| > {log2fc_thresh}"
+        f"{len(table_df)} significant genes at padj <= {padj_thresh}, "
+        f"|log2FC| >= {log2fc_thresh}"
     )
 
     if len(table_df) < 10 and len(table_df) > 0:
@@ -403,8 +403,8 @@ def main() -> None:
                         st.rerun()
     else:
         st.info(
-            f"No genes meet the current thresholds (padj < {padj_thresh}, "
-            f"|log2FC| > {log2fc_thresh}). Try relaxing the thresholds in the sidebar."
+            f"No genes meet the current thresholds (padj <= {padj_thresh}, "
+            f"|log2FC| >= {log2fc_thresh}). Try relaxing the thresholds in the sidebar."
         )
 
 
