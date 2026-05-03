@@ -420,13 +420,31 @@ with st.sidebar.expander("Log", expanded=False):
 # Tab order groups related views together: Pathway Viewer drills into a
 # specific enriched pathway, so it lives next to Enrichment rather than
 # at the end of the list.
-(tab_overview, tab_gene, tab_comparison, tab_enrichment,
- tab_pathway, tab_ma, tab_venn, tab_ranked, tab_degsummary, tab_ppi,
- tab_export) = st.tabs([
+#
+# The PPI Network tab is only created when ``networkx`` is importable.
+# Without it the tab body is unusable; rather than render a clickable
+# tab that just shows an install-instruction warning, hide it entirely.
+_TAB_LABELS: list[str] = [
     "Overview", "Gene Explorer", "Comparison Browser", "Enrichment",
     "Pathway Viewer", "MA Plot", "Venn / UpSet", "Ranked Genes", "DEG Summary",
-    "PPI Network", "Export",
-])
+]
+if _HAS_NETWORKX:
+    _TAB_LABELS.append("PPI Network")
+_TAB_LABELS.append("Export")
+
+_tabs = st.tabs(_TAB_LABELS)
+_tab_iter = iter(_tabs)
+tab_overview = next(_tab_iter)
+tab_gene = next(_tab_iter)
+tab_comparison = next(_tab_iter)
+tab_enrichment = next(_tab_iter)
+tab_pathway = next(_tab_iter)
+tab_ma = next(_tab_iter)
+tab_venn = next(_tab_iter)
+tab_ranked = next(_tab_iter)
+tab_degsummary = next(_tab_iter)
+tab_ppi = next(_tab_iter) if _HAS_NETWORKX else None
+tab_export = next(_tab_iter)
 
 
 # =========================================================================
@@ -497,7 +515,11 @@ with tab_gene:
             key="gene_query",
         )
     with col_opts:
-        padj_thresh = st.number_input("padj threshold", value=0.05, min_value=0.0, max_value=1.0, step=0.01, key="gene_padj")
+        padj_thresh = st.number_input(
+            "Adjusted p-value threshold", value=0.05, min_value=0.0, max_value=1.0, step=0.01,
+            key="gene_padj",
+            help="Genes with adjusted p-value at or below this threshold are flagged as significant in the per-comparison summary. Default 0.05 = 5% false discovery rate.",
+        )
 
     if query:
         query_upper = query.strip().upper()
@@ -666,9 +688,15 @@ with tab_comparison:
         # Thresholds
         col_t1, col_t2, col_t3 = st.columns(3)
         with col_t1:
-            padj_t = st.slider("padj threshold", 0.001, 0.1, 0.05, 0.005, key="comp_padj")
+            padj_t = st.slider(
+                "Adjusted p-value threshold", 0.001, 0.5, 0.05, 0.005, key="comp_padj",
+                help="Genes with adjusted p-value below this threshold are considered statistically significant. Default 0.05 = 5% false discovery rate. Lower values are more stringent.",
+            )
         with col_t2:
-            fc_t = st.slider("|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="comp_fc")
+            fc_t = st.slider(
+                "|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="comp_fc",
+                help="Minimum absolute log2 fold-change for biological significance. 1.0 = 2-fold change, 2.0 = 4-fold change. Set to 0 to see all statistically significant genes regardless of effect size.",
+            )
         with col_t3:
             top_n = st.slider("Label top N genes", 0, 30, 10, key="comp_topn")
 
@@ -779,7 +807,10 @@ with tab_enrichment:
             # Thresholds
             col_e1, col_e2 = st.columns(2)
             with col_e1:
-                enrich_padj = st.slider("padj threshold", 0.001, 0.5, 0.05, 0.005, key="enrich_padj")
+                enrich_padj = st.slider(
+                    "Adjusted p-value threshold", 0.001, 0.5, 0.05, 0.005, key="enrich_padj",
+                    help="Pathways with adjusted p-value below this threshold are considered enriched. Default 0.05 = 5% false discovery rate.",
+                )
             with col_e2:
                 max_terms = st.slider("Max terms to show", 5, 50, 20, key="enrich_max_terms")
 
@@ -982,7 +1013,10 @@ with tab_pathway:
                 st.warning("No term name column found in enrichment data.")
             else:
                 # Filter to significant
-                pw_padj_thresh = st.slider("padj threshold", 0.001, 0.5, 0.05, 0.005, key="pw_padj")
+                pw_padj_thresh = st.slider(
+                    "Adjusted p-value threshold", 0.001, 0.5, 0.05, 0.005, key="pw_padj",
+                    help="Only show pathways with adjusted p-value below this threshold.",
+                )
                 if "padj" in pw_df.columns:
                     pw_sig = pw_df[pw_df["padj"] <= pw_padj_thresh]
                 else:
@@ -1124,9 +1158,15 @@ with tab_ma:
         else:
             col_ma1, col_ma2 = st.columns(2)
             with col_ma1:
-                ma_padj = st.slider("padj threshold", 0.001, 0.1, 0.05, 0.005, key="ma_padj")
+                ma_padj = st.slider(
+                    "Adjusted p-value threshold", 0.001, 0.5, 0.05, 0.005, key="ma_padj",
+                    help="Genes with adjusted p-value below this threshold are coloured as significant on the MA plot. Default 0.05 = 5% false discovery rate.",
+                )
             with col_ma2:
-                ma_fc = st.slider("|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="ma_fc")
+                ma_fc = st.slider(
+                    "|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="ma_fc",
+                    help="Minimum absolute log2 fold-change to colour as up- or down-regulated. 1.0 = 2-fold change, 2.0 = 4-fold change.",
+                )
 
             ma_plot = ma_df.dropna(subset=["log2fc", "padj", "basemean"]).copy()
             ma_plot["log10_basemean"] = np.log10(ma_plot["basemean"].clip(lower=1e-1))
@@ -1191,9 +1231,15 @@ with tab_venn:
 
         col_v1, col_v2 = st.columns(2)
         with col_v1:
-            venn_padj = st.slider("padj threshold", 0.001, 0.1, 0.05, 0.005, key="venn_padj")
+            venn_padj = st.slider(
+                "Adjusted p-value threshold", 0.001, 0.5, 0.05, 0.005, key="venn_padj",
+                help="A gene is included in a comparison's set if its adjusted p-value is below this threshold. Default 0.05 = 5% false discovery rate.",
+            )
         with col_v2:
-            venn_fc = st.slider("|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="venn_fc")
+            venn_fc = st.slider(
+                "|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="venn_fc",
+                help="Minimum absolute log2 fold-change for a gene to count as significant in a comparison. 1.0 = 2-fold change, 2.0 = 4-fold change. Set to 0 to ignore effect size.",
+            )
 
         venn_direction = st.radio(
             "Include", ["All significant", "Upregulated only", "Downregulated only"],
@@ -1299,7 +1345,10 @@ with tab_ranked:
                 "Rank by", ["log2FC (descending)", "padj (ascending)", "Absolute log2FC (descending)"],
                 horizontal=True, key="rank_by",
             )
-            rank_padj = st.slider("padj threshold for highlighting", 0.001, 0.1, 0.05, 0.005, key="rank_padj")
+            rank_padj = st.slider(
+            "Adjusted p-value threshold (highlight cutoff)", 0.001, 0.5, 0.05, 0.005, key="rank_padj",
+            help="Genes whose adjusted p-value is below this threshold are highlighted. Default 0.05 = 5% false discovery rate.",
+        )
 
             ranked = rank_df.dropna(subset=["log2fc", "padj"]).copy()
             if rank_by == "log2FC (descending)":
@@ -1369,11 +1418,13 @@ with tab_degsummary:
         st.warning("No DEG data loaded.")
     else:
         summary_padj = st.slider(
-            "padj threshold (highlight significant)", 0.001, 0.1, 0.05, 0.005,
+            "Adjusted p-value threshold (highlight significant)", 0.001, 0.5, 0.05, 0.005,
             key="summary_padj",
+            help="Cells whose adjusted p-value is at or below this threshold are highlighted as significant. Default 0.05 = 5% false discovery rate.",
         )
         summary_fc = st.slider(
             "|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="summary_fc",
+            help="Minimum absolute log2 fold-change for highlighting. 1.0 = 2-fold change, 2.0 = 4-fold change. Set to 0 to ignore effect size.",
         )
         show_mode = st.radio(
             "Show", ["All genes", "Significant in at least 1 comparison", "Significant in all comparisons"],
@@ -1450,9 +1501,10 @@ with tab_degsummary:
 
 
 # =========================================================================
-# TAB 10: PPI Network
+# TAB 10: PPI Network -- only rendered when networkx is available.
 # =========================================================================
-with tab_ppi:
+if tab_ppi is not None:
+  with tab_ppi:
     st.header("PPI Network")
     st.caption("Explore protein–protein interaction networks from Novogene PPI analysis.")
 
@@ -1722,8 +1774,14 @@ with tab_export:
     if not deg and not enrichment:
         st.warning("No data loaded to export.")
     else:
-        export_padj = st.slider("padj threshold", 0.001, 0.1, 0.05, 0.005, key="export_padj")
-        export_fc = st.slider("|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="export_fc")
+        export_padj = st.slider(
+            "Adjusted p-value threshold", 0.001, 0.5, 0.05, 0.005, key="export_padj",
+            help="Only genes with adjusted p-value below this threshold will be included in the export. Default 0.05 = 5% false discovery rate.",
+        )
+        export_fc = st.slider(
+            "|log2FC| threshold", 0.0, 5.0, 1.0, 0.25, key="export_fc",
+            help="Minimum absolute log2 fold-change for export. 1.0 = 2-fold change, 2.0 = 4-fold change. Set to 0 to ignore effect size.",
+        )
         sig_only = st.checkbox("Export significant genes only", value=True, key="export_sig_only")
 
         st.divider()
