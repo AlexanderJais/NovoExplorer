@@ -13,14 +13,19 @@ bash setup.sh
 # 2. Activate the virtual environment
 source .venv/bin/activate
 
-# 3. Launch the app -- pass your Novogene delivery folder directly
-streamlit run novogene_explorer.py -- /path/to/your/novogene/results
+# 3. Launch the app and pick your delivery folder from the in-app browser
+streamlit run novogene_explorer.py
 ```
 
-Or launch without arguments to pick the folder in the browser:
+Once the app opens, use the sidebar folder browser to navigate to your Novogene
+delivery and click **Use this folder**. Quick-jump shortcuts for `/Volumes`,
+`/mnt`, and `/media` make external drives one click away.
+
+If you'd rather skip the browser and pass the folder up front, append it after
+the `--` separator:
 
 ```bash
-streamlit run novogene_explorer.py
+streamlit run novogene_explorer.py -- /path/to/your/novogene/results
 ```
 
 No configuration files, no pipeline commands. Just point and explore.
