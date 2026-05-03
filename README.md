@@ -89,7 +89,7 @@ question:
 | **Gene Explorer** | "What does this specific gene do across all my comparisons?" |
 | **Comparison Browser** | "Show me a volcano plot and let me filter the DEG table." |
 | **Enrichment** | "Which biological pathways are enriched? GO, KEGG, Reactome, etc." |
-| **Pathway Viewer** | "Show me the genes in a specific enriched pathway, coloured by their fold change." |
+| **Pathway Genes** | "Show me the genes in a specific enriched pathway, coloured by their fold change." |
 | **MA Plot** | "Are my fold changes biased by expression level?" |
 | **Venn / UpSet** | "Which DEGs are shared between two or more comparisons?" |
 | **Ranked Genes** | "Show every gene ranked by fold change or significance." |

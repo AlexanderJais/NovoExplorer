@@ -292,7 +292,8 @@ st.sidebar.text_input(
     "Folder path",
     key="_path_input",
     on_change=_on_path_change,
-    help="Paste a full path and press Enter",
+    placeholder="/path/to/your/novogene/results",
+    help="Paste a full path and press Enter, or browse using the buttons below.",
 )
 
 # Quick-jump shortcuts (home + external disk mount points)
@@ -317,19 +318,33 @@ if safe_is_dir(browse_path):
     if str(browse_path) != st.session_state.get(KEY_PATH_INPUT, ""):
         st.sidebar.caption(f"📂 `{browse_path}`")
 
-    # Action buttons
-    col_up, col_use = st.sidebar.columns(2)
-    with col_up:
-        if browse_path.parent != browse_path:
-            st.button("↑ Up", key="browse_up", on_click=_go_up, width="stretch")
-    with col_use:
-        st.button(
+    # When the current path looks like a Novogene delivery, prompt the
+    # user to load it: full-width primary button ahead of the smaller
+    # "Up" navigation. Otherwise fall back to the side-by-side layout
+    # so navigation isn't visually demoted while the user is still
+    # hunting for the right folder.
+    _looks_novogene = looks_like_novogene_shallow(browse_path)
+    if _looks_novogene:
+        st.sidebar.success("Novogene data detected — click below to load.")
+        st.sidebar.button(
             "✓ Use this folder", key="browse_use", type="primary",
             on_click=_use_folder, width="stretch",
         )
-
-    if looks_like_novogene_shallow(browse_path):
-        st.sidebar.success("Novogene data detected")
+        if browse_path.parent != browse_path:
+            st.sidebar.button(
+                "↑ Up to parent", key="browse_up",
+                on_click=_go_up, width="stretch",
+            )
+    else:
+        col_up, col_use = st.sidebar.columns(2)
+        with col_up:
+            if browse_path.parent != browse_path:
+                st.button("↑ Up", key="browse_up", on_click=_go_up, width="stretch")
+        with col_use:
+            st.button(
+                "✓ Use this folder", key="browse_use", type="primary",
+                on_click=_use_folder, width="stretch",
+            )
 
     # List subdirectories as clickable buttons
     subdirs = list_subdirs(browse_path)
@@ -417,19 +432,42 @@ with st.sidebar.expander("Log", expanded=False):
 # Main tabs
 # ---------------------------------------------------------------------------
 
-# Tab order groups related views together: Pathway Viewer drills into a
+# Tab order groups related views together: Pathway Genes drills into a
 # specific enriched pathway, so it lives next to Enrichment rather than
 # at the end of the list.
 #
 # The PPI Network tab is only created when ``networkx`` is importable.
 # Without it the tab body is unusable; rather than render a clickable
 # tab that just shows an install-instruction warning, hide it entirely.
+#
+# Tabs that depend on data the current delivery may not contain get a
+# leading "🔒" glyph so the user can see at a glance which tabs are
+# usable - e.g. enrichment tabs are locked when the delivery has no
+# Enrichment/ folder, and Venn / UpSet is locked with only one
+# comparison.
+_has_deg = bool(deg)
+_has_enrichment = bool(enrichment)
+_has_multi_comparison = len(deg) >= 2 if deg else False
+_LOCK = "🔒 "
+
+
+def _label(name: str, available: bool) -> str:
+    return name if available else _LOCK + name
+
+
 _TAB_LABELS: list[str] = [
-    "Overview", "Gene Explorer", "Comparison Browser", "Enrichment",
-    "Pathway Viewer", "MA Plot", "Venn / UpSet", "Ranked Genes", "DEG Summary",
+    "Overview",
+    _label("Gene Explorer", _has_deg),
+    _label("Comparison Browser", _has_deg),
+    _label("Enrichment", _has_enrichment),
+    _label("Pathway Genes", _has_enrichment),
+    _label("MA Plot", _has_deg),
+    _label("Venn / UpSet", _has_multi_comparison),
+    _label("Ranked Genes", _has_deg),
+    _label("DEG Summary", _has_deg),
 ]
 if _HAS_NETWORKX:
-    _TAB_LABELS.append("PPI Network")
+    _TAB_LABELS.append(_label("PPI Network", bool(ppi)))
 _TAB_LABELS.append("Export")
 
 _tabs = st.tabs(_TAB_LABELS)
@@ -994,11 +1032,14 @@ with tab_enrichment:
 
 
 # =========================================================================
-# TAB 5: Pathway Viewer
+# TAB 5: Pathway Genes
 # =========================================================================
 with tab_pathway:
-    st.header("Pathway Viewer")
-    st.caption("Select an enriched term and see its member genes colored by log2FC.")
+    st.header("Pathway Genes")
+    st.caption(
+        "Drill into a specific enriched pathway from the Enrichment tab and "
+        "see which genes belong to it, coloured by log2FC."
+    )
 
     if not enrichment:
         st.warning(
