@@ -373,7 +373,10 @@ def detect_outliers(
         mean_dist = distances.mean()
         sd_dist = distances.std(ddof=1)
 
-        if sd_dist == 0:
+        # ddof=1 std is NaN for single-sample groups, and floating-point
+        # noise can leave sd at ~1e-15 instead of exact zero for groups
+        # of identical samples.
+        if not np.isfinite(sd_dist) or np.isclose(sd_dist, 0.0):
             continue
 
         threshold = mean_dist + n_sd * sd_dist

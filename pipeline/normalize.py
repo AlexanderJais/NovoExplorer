@@ -370,8 +370,9 @@ def get_top_variable_genes(
         return df
 
     gene_var = df.var(axis=1)
-    # Guard against all-zero variance (constant expression across samples)
-    if gene_var.max() == 0 or gene_var.dropna().empty:
+    # Guard against all-zero variance (constant expression across samples).
+    # Use isclose to also catch values within float rounding of zero.
+    if gene_var.dropna().empty or np.isclose(gene_var.max(), 0.0):
         logger.warning(
             "All genes have zero variance -- returning full matrix unchanged."
         )
