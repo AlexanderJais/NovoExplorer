@@ -1,56 +1,124 @@
 # NovoExplorer
 
-Interactive Streamlit application for browsing and analyzing Novogene bulk RNA-Seq deliveries.
+**A point-and-click app for exploring Novogene RNA-Seq results -- no coding required.**
 
-Point it at your Novogene results folder and instantly get volcano plots, MA plots, enrichment dot plots, pathway views, gene-level exploration, and more -- no coding required.
+Got a Novogene delivery folder back from the sequencing service and want to see
+your differentially expressed genes, pathways, and quality-control plots
+without writing any code? That's what this is for.
 
-## Quick Start
+Open the app, point it at the folder Novogene gave you, and you'll get:
+
+- volcano plots of every comparison
+- searchable gene tables and per-gene fold-change charts
+- enrichment dot plots for GO, KEGG, Reactome, DisGeNET, and DO
+- protein-protein interaction networks
+- UpSet / Venn overlaps between comparisons
+- one-click Excel and CSV exports
+
+You don't need to understand the file formats or run any scripts on the data.
+Everything happens inside the app once you've installed it.
+
+---
+
+## Getting started
+
+You'll need to do this once to install the app, then you can open it any time.
+
+### 1. Install (one time)
+
+Open a terminal in the folder where you've downloaded NovoExplorer and run:
 
 ```bash
-# 1. Run the setup script (creates venv, installs deps, downloads gene sets)
 bash setup.sh
+```
 
-# 2. Activate the virtual environment
+This sets up an isolated Python environment and downloads everything the app
+needs. It can take a few minutes the first time. You only do this once.
+
+> **Don't have Python yet?** Install Python 3.10 or newer from
+> [python.org](https://www.python.org/downloads/) (any version 3.10, 3.11, or
+> 3.12 works), then run the line above.
+
+### 2. Open the app
+
+Every time you want to use NovoExplorer, run these two lines in a terminal
+opened in the NovoExplorer folder:
+
+```bash
 source .venv/bin/activate
-
-# 3. Launch the app and pick your delivery folder from the in-app browser
 streamlit run novogene_explorer.py
 ```
 
-Once the app opens, use the sidebar folder browser to navigate to your Novogene
-delivery and click **Use this folder**. Quick-jump shortcuts for `/Volumes`,
-`/mnt`, and `/media` make external drives one click away.
+Your browser will open automatically. If it doesn't, copy the
+`http://localhost:...` link the terminal prints into your browser.
 
-If you'd rather skip the browser and pass the folder up front, append it after
-the `--` separator:
+### 3. Pick your data folder
 
-```bash
-streamlit run novogene_explorer.py -- /path/to/your/novogene/results
-```
+In the sidebar on the left, use the folder browser to navigate to the Novogene
+delivery folder (the top-level folder you got from the sequencing service)
+and click **Use this folder**. That's it -- the tabs across the top will fill
+with plots and tables.
 
-No configuration files, no pipeline commands. Just point and explore.
+> **External hard drive?** Quick-jump shortcuts for `/Volumes` (macOS),
+> `/mnt`, `/media`, and `/run/media` (Linux) sit right above the file
+> browser, so external drives are one click away. The app handles
+> permission errors and disconnected disks gracefully.
 
-## Features
+> **Prefer to skip the picker?** You can pass the folder directly:
+>
+> ```bash
+> streamlit run novogene_explorer.py -- /path/to/your/novogene/results
+> ```
 
-NovoExplorer provides 11 interactive tabs:
+### 4. Stop the app
 
-| Tab | Description |
-|-----|-------------|
-| **Overview** | DEG summary statistics, bar charts of up/down-regulated gene counts per comparison |
-| **Gene Explorer** | Search any gene, see its log2FC across all comparisons, multi-gene heatmap |
-| **Comparison Browser** | Volcano plot with interactive gene labels, filterable DEG table |
-| **Enrichment** | Dot plots, bar charts, cross-comparison enrichment search |
-| **MA Plot** | baseMean vs log2FC -- reveals expression-dependent fold changes |
-| **Venn / UpSet** | Overlap of significant DEGs across comparisons |
-| **Ranked Genes** | Waterfall plot of all genes sorted by fold change or significance |
-| **DEG Summary** | Wide table: log2FC + padj for every gene across all comparisons |
-| **Pathway Viewer** | Select a GO/KEGG/Reactome term, see member genes colored by log2FC |
-| **PPI Network** | Protein-protein interaction hub analysis, score filtering, gene neighborhood |
-| **Export** | Download Excel workbook or ZIP of CSVs with optional significance filtering |
+When you're done, switch back to the terminal and press `Ctrl+C` (or just close
+the terminal window). Your data is never modified -- the app only reads from
+the delivery folder.
 
-## Supported Data
+---
 
-NovoExplorer auto-detects the standard Novogene delivery folder structure:
+## What you can do in the app
+
+NovoExplorer organises everything into 11 tabs. Pick the one that matches your
+question:
+
+| Tab | What it answers |
+|-----|-----------------|
+| **Overview** | "How many up- and down-regulated genes are there per comparison?" |
+| **Gene Explorer** | "What does this specific gene do across all my comparisons?" |
+| **Comparison Browser** | "Show me a volcano plot and let me filter the DEG table." |
+| **Enrichment** | "Which biological pathways are enriched? GO, KEGG, Reactome, etc." |
+| **MA Plot** | "Are my fold changes biased by expression level?" |
+| **Venn / UpSet** | "Which DEGs are shared between two or more comparisons?" |
+| **Ranked Genes** | "Show every gene ranked by fold change or significance." |
+| **DEG Summary** | "I want one wide table: log2FC + padj for every gene, every comparison." |
+| **Pathway Viewer** | "Show me the genes in this pathway, coloured by their fold change." |
+| **PPI Network** | "Which genes are network hubs? What's the neighborhood of my gene of interest?" |
+| **Export** | "Give me a single Excel workbook (or ZIP of CSVs) for sharing." |
+
+All plots are interactive: hover for tooltips, drag to zoom, double-click to
+reset, and click the camera icon to download a PNG.
+
+---
+
+## What kind of folder works?
+
+The standard Novogene RNA-Seq delivery, untouched. The app looks for the
+folders Novogene already creates (`Differential/`, `Enrichment/`,
+`Quantification/`) and figures out the layout automatically -- both the
+"by database" layout (`Enrichment/GO/CompA_vs_CompB/...`) and the "by
+comparison" layout (`Enrichment/CompA_vs_CompB/GO/...`) are handled.
+
+If your delivery doesn't load, the most common culprits are:
+
+- The folder you pointed at is one level too high or too low. Try the
+  parent or a child folder.
+- The DEG files are named in a non-standard way. The app accepts most common
+  variants but you can compare against the layout below.
+
+<details>
+<summary>Click to see the expected folder layout</summary>
 
 ```
 your_results/
@@ -58,8 +126,7 @@ your_results/
     1.deglist/
       GroupA_vs_GroupB/
         GroupA_vs_GroupB_deg.xls
-    2.cluster/
-      ...
+    2.cluster/ ...
   Enrichment/
     GO/
       GroupA_vs_GroupB/ALL/*.xls
@@ -75,117 +142,132 @@ your_results/
       GroupA_vs_GroupB/ALL/*.xls
 ```
 
-Both `database_first` (e.g. `Enrichment/GO/CompA_vs_CompB/`) and `comparison_first` (e.g. `Enrichment/CompA_vs_CompB/GO/`) layouts are detected automatically.
+Files in any encoding (UTF-8, GB18030, or Latin-1) are handled.
 
-### Supported Enrichment Databases
+</details>
 
-| Database | Description |
-|----------|-------------|
-| GO | Gene Ontology (Biological Process, Molecular Function, Cellular Component) |
-| KEGG | Kyoto Encyclopedia of Genes and Genomes pathways |
-| DisGeNET | Disease-gene associations |
-| DO | Disease Ontology |
-| Reactome | Reactome pathway database |
-| PPI | Protein-protein interaction networks |
+---
 
-## Advanced: Analysis Pipeline + Multi-Page App
+## Troubleshooting
 
-For deeper analysis (normalization, QC, gene similarity, GSEA, signature overlap), NovoExplorer includes a computational pipeline and a multi-page app that builds on the pipeline's results.
+### The terminal says `setup.sh` failed
 
-### Running the Pipeline
+Re-running `bash setup.sh` is safe. It picks up where it left off. If a
+specific dependency keeps failing on macOS Intel, the [Platform Notes](#platform-notes-for-developers)
+section below has manual steps.
+
+### "No module named 'pipeline'" when launching the app
+
+You're not in the NovoExplorer folder. In your terminal, run:
+
+```bash
+cd /path/to/NovoExplorer
+source .venv/bin/activate
+streamlit run novogene_explorer.py
+```
+
+### The app says my folder isn't recognised
+
+Try the parent folder, or open the delivery in a file manager and look for a
+folder called `Differential` or `Enrichment` -- point NovoExplorer one level
+above that.
+
+### A page is showing the wrong / stale data after I edited my files
+
+The app caches loaded data per-folder. Reload the browser tab (or restart
+with `Ctrl+C` and `streamlit run ...` again).
+
+---
+
+## For analysts and developers
+
+Everything below is optional. The point-and-click app above is enough for most
+visual exploration.
+
+### Advanced: Analysis Pipeline + Multi-Page App
+
+For deeper analysis (normalization, QC, gene-similarity, GSEA, signature
+overlap), NovoExplorer ships a computational pipeline and a separate
+multi-page Streamlit app that builds on the pipeline's results.
 
 ```bash
 # Option A: launch the multi-page app and run the pipeline from the browser
 streamlit run app/app.py
 
-# Option B: run from the command line with a config file
+# Option B: run the pipeline from the command line, then open the app
 python run_pipeline.py --config config.yaml
 streamlit run app/app.py -- --config config.yaml
 ```
 
-The multi-page app (`app/app.py`) can detect a raw Novogene delivery folder, let you configure settings in the browser, and run the pipeline without touching the command line.
+The multi-page app at `app/app.py` can detect a raw Novogene delivery folder,
+let you set parameters in the browser, and run the pipeline without touching
+the command line.
 
-### Pipeline Stages
+#### Pipeline stages
 
 | Stage | Module | What it does |
 |-------|--------|-------------|
-| **1. Ingest** | `pipeline/ingest.py` | Walks the Novogene delivery folder, discovers quantification matrices, DEG tables, and enrichment results. |
-| **2. Normalize** | `pipeline/normalize.py` | Filters low-count genes, computes TPM, produces a log2(TPM+1) expression matrix. |
+| **1. Ingest** | `pipeline/ingest.py` | Walks the delivery folder, discovers quantification matrices, DEG tables, and enrichment results. |
+| **2. Normalize** | `pipeline/normalize.py` | Filters low-count genes, computes TPM, produces a log2(TPM+1) matrix. |
 | **3. QC** | `pipeline/qc.py` | Library sizes, detection rates, mitochondrial fractions, sample correlation, PCA, UMAP. |
-| **4. Differential Expression** | `pipeline/diffexp.py` | Cleans Novogene DEG results. Optionally re-runs DE via pyDESeq2. |
-| **5. Similarity** | `pipeline/similarity.py` | Gene-gene cosine similarity, hierarchical clustering, expression signature vectors. |
+| **4. Differential expression** | `pipeline/diffexp.py` | Cleans Novogene DEG results. Optionally re-runs DE via pyDESeq2. |
+| **5. Similarity** | `pipeline/similarity.py` | Gene-gene cosine similarity, hierarchical clustering, signature vectors. |
 | **6. Signatures** | `pipeline/signatures.py` | GSEA, ORA via gseapy, Jaccard overlap, core/unique pathway signatures. |
-| **7. Save** | `pipeline/persistence.py` | Persists all results to `results/novoexplorer_results.h5`. |
+| **7. Save** | `pipeline/persistence.py` | Atomically writes every output to `results/novoexplorer_results.h5`. |
 
-### Multi-Page App
+#### Extra pages (pipeline-backed app only)
 
-The pipeline-backed app provides additional analytical features not available in the main explorer:
-
-| Page | What it adds beyond the main explorer |
-|------|---------------------------------------|
+| Page | What it adds |
+|------|--------------|
 | **Overview** | PCA scatter, UMAP, sample correlation heatmap, library size / detection rate QC |
 | **Differential Expression** | Per-gene expression bar charts, gene basket for collecting genes across pages |
 | **Gene Search** | Similar-gene discovery via cosine similarity across expression profiles |
-| **Signatures & Pathways** | GSEA dot plots, Jaccard overlap heatmap, core/unique signature identification |
+| **Signatures & Pathways** | GSEA dot plots, Jaccard overlap heatmap, core / unique signature identification |
 | **Multi-Condition** | Fold-change concordance scatter between comparison pairs |
 
-## Configuration
+### Configuration (`config.yaml`)
 
-`config.yaml` is only needed for the pipeline (not for the main explorer). All keys are optional -- defaults are applied for anything omitted.
-
-### Core Settings
+Only used by the pipeline -- not by the main explorer. All keys are optional;
+defaults are applied for anything omitted.
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `project_name` | `""` | Display name shown in the app sidebar. |
 | `data_dir` | `"."` | Path to the Novogene delivery folder. |
-| `output_dir` | `"results"` | Directory where the HDF5 results file is written. |
-| `organism` | `"human"` | `"human"` or `"mouse"`. Controls gene name mappings and gene set organisms. |
-
-### Differential Expression
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `padj_threshold` | `0.05` | Adjusted p-value cutoff for significance. |
-| `log2fc_threshold` | `1.0` | Absolute log2 fold-change cutoff. |
-| `rerun_de` | `false` | If `true`, re-run DE from raw counts via pyDESeq2, even when Novogene DEG results exist. |
-| `comparisons` | `"auto"` | Set to `"auto"` to discover comparisons from folder names, or provide an explicit list (e.g. `[["Treatment", "Control"]]`). |
-
-### Gene Similarity
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `similarity_variable_genes` | `5000` | Number of top-variable genes for the cosine similarity matrix. |
-
-### Signature Analysis
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `signature_min_comparisons` | `2` | Minimum comparisons a pathway must be enriched in to be called a "core" signature. |
-| `gene_set_databases` | `["MSigDB_Hallmark_2020", ...]` | Gene-set libraries for enrichment analysis. See the [Enrichr libraries list](https://maayanlab.cloud/Enrichr/#libraries). |
-
-### Advanced
-
-| Key | Default | Description |
-|-----|---------|-------------|
+| `output_dir` | `"results"` | Where the HDF5 results file is written. Relative paths resolve against `data_dir`. |
+| `organism` | `"human"` | `"human"` or `"mouse"`. Controls gene-name mappings and gene-set organisms. |
+| `padj_threshold` | `0.05` | Inclusive adjusted-p-value cutoff for "significant". |
+| `log2fc_threshold` | `1.0` | Inclusive absolute log2 fold-change cutoff. |
+| `rerun_de` | `false` | If `true`, re-run DE from raw counts via pyDESeq2 even when Novogene DEG results are present. |
+| `comparisons` | `"auto"` | `"auto"` discovers them from folder names; or pass a list (e.g. `[["Treatment", "Control"]]`). |
+| `similarity_variable_genes` | `5000` | Top-variable genes used for the gene-gene cosine similarity matrix. |
+| `signature_min_comparisons` | `2` | Minimum number of comparisons a pathway must appear in to be a "core" signature. |
+| `gene_set_databases` | `["MSigDB_Hallmark_2020", ...]` | Gene-set libraries for enrichment analysis (see [Enrichr libraries](https://maayanlab.cloud/Enrichr/#libraries)). |
 | `log_level` | `"INFO"` | Python logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
 
-## Requirements
+The defaults are defined in `pipeline/constants.py` so editing them in one place
+updates the entire pipeline.
+
+### Requirements
 
 - **Python 3.10+** (tested on 3.10, 3.11, 3.12)
-- See `requirements.txt` for the full dependency list.
+- See `requirements.txt` for the full pinned dependency list.
 
-Key dependencies: Streamlit, pandas, NumPy, Plotly, Matplotlib, pyDESeq2, gseapy, scikit-learn, UMAP, h5py, networkx.
+Key dependencies: Streamlit, pandas, NumPy, Plotly, Matplotlib, pyDESeq2,
+gseapy, scikit-learn, UMAP, h5py, networkx.
 
-### Platform Notes
+#### Platform notes (for developers)
 
 `setup.sh` handles the following automatically:
 
-- **macOS (Intel x86_64):** gseapy has no prebuilt wheel for this platform. The setup script installs a minimal Rust toolchain via [rustup](https://rustup.rs) so pip can build gseapy from source. numba/llvmlite are pinned to versions that still ship Intel Mac wheels.
-- **macOS (Apple Silicon):** All dependencies install from prebuilt wheels. No extra toolchains required.
-- **Linux:** All dependencies install from prebuilt wheels.
+- **macOS (Intel x86_64):** gseapy has no prebuilt wheel for this platform.
+  The setup script installs a minimal Rust toolchain via
+  [rustup](https://rustup.rs) so pip can build gseapy from source.
+  numba/llvmlite are pinned to versions that still ship Intel Mac wheels.
+- **macOS (Apple Silicon):** all dependencies install from prebuilt wheels.
+- **Linux:** all dependencies install from prebuilt wheels.
 
-If you prefer to install manually:
+Manual install:
 
 ```bash
 python3 -m venv .venv
@@ -194,52 +276,37 @@ pip install --upgrade pip
 pip install --prefer-binary -r requirements.txt
 ```
 
-## Project Structure
+### Project layout
 
 ```
 NovoExplorer/
-  novogene_explorer.py    # Main Streamlit app (11 tabs, direct Novogene folder browsing)
+  novogene_explorer.py    # Main app (11 tabs, direct Novogene folder browsing)
   run_pipeline.py         # CLI entry point for the analysis pipeline
-  config.yaml             # Pipeline configuration (not needed for main app)
+  config.yaml             # Pipeline configuration (not needed for the main app)
   setup.sh                # One-step setup script (venv + deps + gene sets)
-  requirements.txt        # Python dependencies with platform-specific pins
-  app/                    # Multi-page Streamlit app (pipeline-backed, additional analyses)
-    app.py                #   Entry point, data picker, in-app pipeline runner
-    style.css             #   Custom theme
-    pages/                #   Individual pages (overview, diffexp, gene search, ...)
+  requirements.txt        # Python dependencies, pinned at major versions
+  app/                    # Multi-page app (pipeline-backed analyses)
+    app.py                #   Welcome screen, data picker, in-app pipeline runner
+    pages/                #   Individual pages
     components/           #   Shared UI widgets (filters, gene basket, downloads)
+    cache_utils.py        #   File-mtime cache invalidation helper
+    file_utils.py         #   Safe filesystem traversal helpers
+    session.py            #   Typed session_state contract
   pipeline/               # Analysis pipeline modules
-    ingest.py             #   Novogene folder discovery & file parsing
-    normalize.py          #   Count filtering, TPM computation, log2 transform
+    constants.py          #   Single source of truth for default thresholds
+    ingest.py             #   Folder discovery, file parsing (UTF-8 / GB18030 / Latin-1)
+    normalize.py          #   Count filtering, TPM, log2 transform
     qc.py                 #   PCA, UMAP, correlation, outlier detection
-    diffexp.py            #   DEG cleaning, pyDESeq2 re-analysis, merging
-    similarity.py         #   Cosine similarity, hierarchical clustering, signatures
-    signatures.py         #   GSEA, ORA, Jaccard overlap, core/unique pathways
-    persistence.py        #   HDF5 save/load for all pipeline results
-    utils.py              #   Column standardization, flexible file reading, config
-  plotting/               # Figure builders (Plotly + Matplotlib, Nature-style theme)
-    volcano.py            #   Volcano plots (matplotlib + plotly)
-    ma_plot.py            #   MA plots (baseMean vs log2FC)
-    heatmap.py            #   Clustered heatmaps (seaborn clustermap)
-    enrichment.py         #   Enrichment dot plots and bar charts
-    pca.py                #   PCA scatter plots
-    similarity_viz.py     #   Similarity heatmaps and network graphs
-    upset.py              #   UpSet plots for set intersections
-    ppi_network.py        #   PPI network visualization
-    theme.py              #   Shared color palettes and styling
-  tests/                  # Pytest test suite
-    conftest.py           #   Shared fixtures
-    test_ingest.py        #   Ingest parsing tests
-    test_normalize.py     #   Normalization and filtering tests
-    test_diffexp.py       #   Differential expression tests
-    test_qc.py            #   QC metric tests
-    test_similarity.py    #   Similarity and clustering tests
-    test_signatures.py    #   GSEA, ORA, overlap tests
-    test_persistence.py   #   HDF5 roundtrip tests
-    test_utils.py         #   Utility function tests
+    diffexp.py            #   DEG cleaning, pyDESeq2 re-analysis
+    similarity.py         #   Cosine similarity, hierarchical clustering
+    signatures.py         #   GSEA, ORA, Jaccard overlap
+    persistence.py        #   Atomic HDF5 save/load
+    utils.py              #   Column standardisation, encoding-flexible reader, config
+  plotting/               # Figure builders (Plotly + Matplotlib)
+  tests/                  # Pytest suite (244 tests covering pipeline, app pages, plots)
 ```
 
-## Running Tests
+### Running the test suite
 
 ```bash
 source .venv/bin/activate
@@ -252,42 +319,27 @@ To run a specific module:
 pytest tests/test_diffexp.py -v
 ```
 
-## Troubleshooting
+### Troubleshooting (developer environments)
 
-### `setup.sh` fails with "can't find Rust compiler"
-
-gseapy requires a Rust toolchain when building from source (no prebuilt wheel available for your platform). The setup script tries to install Rust automatically on macOS. If it fails:
+**`setup.sh` fails with "can't find Rust compiler"** -- gseapy needs Rust when
+building from source. The setup script installs Rust automatically on macOS;
+if it doesn't, run:
 
 ```bash
-# Install Rust manually
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
-
-# Re-run setup
 bash setup.sh
 ```
 
-### `setup.sh` fails with "No such file or directory: 'cmake'"
-
-This happens when llvmlite is built from source. The pinned versions in `requirements.txt` should provide prebuilt wheels. If you hit this anyway, install CMake:
+**`setup.sh` fails with "No such file or directory: 'cmake'"** -- this happens
+when llvmlite has to build from source. The pinned versions in
+`requirements.txt` should ship prebuilt wheels; if you hit this anyway:
 
 ```bash
 # macOS
 brew install cmake
-
-# Ubuntu/Debian
+# Ubuntu / Debian
 sudo apt-get install cmake
 
-# Then re-run setup
 bash setup.sh
-```
-
-### Streamlit shows "No module named 'pipeline'"
-
-Make sure you launch the app from the NovoExplorer root directory:
-
-```bash
-cd /path/to/NovoExplorer
-source .venv/bin/activate
-streamlit run novogene_explorer.py
 ```
