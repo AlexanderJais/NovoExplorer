@@ -110,26 +110,35 @@ def _create_volcano_with_highlight(
         top_n_labels=10,
     )
 
-    if highlight_gene and "gene_name" in deg_df.columns and highlight_gene in deg_df["gene_name"].values:
-        row = deg_df[deg_df["gene_name"] == highlight_gene].iloc[0]
-        neg_log10 = -np.log10(max(row["padj"], 1e-300))
-        fig.add_trace(
-            go.Scatter(
-                x=[row["log2fc"]],
-                y=[neg_log10],
-                mode="markers+text",
-                marker=dict(color="#FFD700", size=14, line=dict(color="black", width=2)),
-                text=[highlight_gene],
-                textposition="top center",
-                textfont=dict(size=11, color="black"),
-                name=f"Searched: {highlight_gene}",
-                hovertemplate=(
-                    f"<b>{highlight_gene}</b><br>"
-                    f"log2FC: {row['log2fc']:.2f}<br>"
-                    f"padj: {row['padj']:.2e}<extra></extra>"
-                ),
-            )
+    if not (
+        highlight_gene
+        and {"gene_name", "padj", "log2fc"}.issubset(deg_df.columns)
+        and highlight_gene in deg_df["gene_name"].values
+    ):
+        return fig
+
+    row = deg_df[deg_df["gene_name"] == highlight_gene].iloc[0]
+    if pd.isna(row["padj"]) or pd.isna(row["log2fc"]):
+        return fig
+
+    neg_log10 = -np.log10(max(row["padj"], 1e-300))
+    fig.add_trace(
+        go.Scatter(
+            x=[row["log2fc"]],
+            y=[neg_log10],
+            mode="markers+text",
+            marker=dict(color="#FFD700", size=14, line=dict(color="black", width=2)),
+            text=[highlight_gene],
+            textposition="top center",
+            textfont=dict(size=11, color="black"),
+            name=f"Searched: {highlight_gene}",
+            hovertemplate=(
+                f"<b>{highlight_gene}</b><br>"
+                f"log2FC: {row['log2fc']:.2f}<br>"
+                f"padj: {row['padj']:.2e}<extra></extra>"
+            ),
         )
+    )
 
     return fig
 
@@ -213,6 +222,17 @@ def main() -> None:
     st.caption(
         f"padj threshold: {padj_thresh}, |log2FC| threshold: {log2fc_thresh}"
     )
+
+    missing_cols = {"padj", "log2fc"} - set(deg_df.columns)
+    if missing_cols:
+        st.error(
+            f"DEG table for **{selected_comparison}** is missing required "
+            f"column(s): {', '.join(sorted(missing_cols))}. "
+            "Cannot render volcano plot. Check that the upstream Novogene "
+            "delivery contains a standard differential-expression table."
+        )
+        return
+
     fig_volcano = _create_volcano_with_highlight(
         deg_df,
         padj_threshold=padj_thresh,
