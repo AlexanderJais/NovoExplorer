@@ -398,6 +398,9 @@ def load_config(path) -> dict:
     ------
     FileNotFoundError
         If *path* does not exist.
+    ValueError
+        If *path* exists but is not valid YAML. Wraps the underlying
+        ``yaml.YAMLError`` so callers don't need to import pyyaml.
     """
     path = Path(path)
 
@@ -414,12 +417,12 @@ def load_config(path) -> dict:
         with open(path, "r", encoding="utf-8") as fh:
             user_config = yaml.safe_load(fh)
     except yaml.YAMLError as exc:
-        _logger.error(
-            "Failed to parse YAML configuration '%s': %s. "
-            "Using default configuration.",
-            path, exc,
-        )
-        return dict(_DEFAULT_CONFIG)
+        # Surface the parse error rather than silently substituting defaults -
+        # otherwise the entire pipeline would run against unrequested values
+        # and the user would have no idea their config was ignored.
+        raise ValueError(
+            f"Failed to parse YAML configuration '{path}': {exc}"
+        ) from exc
 
     if user_config is None:
         _logger.warning("Configuration file '%s' is empty; using defaults.", path)

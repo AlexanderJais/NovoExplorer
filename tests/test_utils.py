@@ -222,8 +222,10 @@ class TestLoadConfig:
         with pytest.raises(FileNotFoundError):
             load_config(tmp_path / "nonexistent.yaml")
 
-    def test_malformed_yaml_returns_defaults(self, tmp_path):
+    def test_malformed_yaml_raises(self, tmp_path):
+        # Silently substituting defaults on parse error would run the
+        # pipeline against unrequested values; surface the error instead.
         p = tmp_path / "bad.yaml"
         p.write_text(":\n  - :\n    invalid: [")
-        cfg = load_config(p)
-        assert cfg["organism"] == "human"
+        with pytest.raises(ValueError, match="Failed to parse YAML"):
+            load_config(p)
