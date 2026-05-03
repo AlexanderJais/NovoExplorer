@@ -105,17 +105,23 @@ def _load_project_config(config_path: str) -> dict:
 
 def _resolve_results_path(folder: str) -> str | None:
     """Given a folder or file path, return the HDF5 results path or None."""
-    p = Path(folder).expanduser().resolve()
-    if p.is_file() and p.suffix in (".h5", ".hdf5"):
-        return str(p)
-    if p.is_dir():
-        candidate = p / _DEFAULT_RESULTS_FILENAME
-        if candidate.exists():
-            return str(candidate)
-        # Check for any .h5 file in the directory
-        h5_files = sorted(p.glob("*.h5"))
-        if len(h5_files) == 1:
-            return str(h5_files[0])
+    try:
+        p = Path(folder).expanduser().resolve()
+    except OSError:
+        return None
+    try:
+        if p.is_file() and p.suffix in (".h5", ".hdf5"):
+            return str(p)
+        if p.is_dir():
+            candidate = p / _DEFAULT_RESULTS_FILENAME
+            if candidate.exists():
+                return str(candidate)
+            # Check for any .h5 file in the directory
+            h5_files = sorted(p.glob("*.h5"))
+            if len(h5_files) == 1:
+                return str(h5_files[0])
+    except OSError:
+        return None
     return None
 
 
@@ -164,15 +170,35 @@ def _init_session_state() -> None:
 # Interactive data picker (welcome / launcher screen)
 # ---------------------------------------------------------------------------
 
+def _safe_iterdir(p: Path) -> list[Path]:
+    """List children of *p*, returning [] on permission/IO errors.
+
+    External disks (network mounts, USB drives, encrypted volumes) can raise
+    ``PermissionError`` or ``OSError`` mid-iteration. We swallow those so the
+    welcome screen never crashes when pointed at an external drive.
+    """
+    try:
+        return list(p.iterdir())
+    except (PermissionError, OSError):
+        return []
+
+
+def _safe_is_dir(p: Path) -> bool:
+    try:
+        return p.is_dir()
+    except OSError:
+        return False
+
+
 def _looks_like_novogene_delivery(folder: Path) -> bool:
     """Return True if *folder* contains directories matching Novogene patterns."""
-    if not folder.is_dir():
+    if not _safe_is_dir(folder):
         return False
-    names = {c.name.lower() for c in folder.iterdir() if c.is_dir()}
+    names = {c.name.lower() for c in _safe_iterdir(folder) if _safe_is_dir(c)}
     # Also check one level down (Novogene sometimes nests under a project dir)
-    for child in folder.iterdir():
-        if child.is_dir():
-            names |= {gc.name.lower() for gc in child.iterdir() if gc.is_dir()}
+    for child in _safe_iterdir(folder):
+        if _safe_is_dir(child):
+            names |= {gc.name.lower() for gc in _safe_iterdir(child) if _safe_is_dir(gc)}
     markers = {"differential", "enrichment", "quantification"}
     # Match against known Novogene patterns
     for n in names:
@@ -242,9 +268,27 @@ def _show_data_picker() -> None:
         return
 
     user_path = user_path.strip()
-    p = Path(user_path).expanduser().resolve()
+    try:
+        p = Path(user_path).expanduser().resolve()
+    except OSError as exc:
+        st.error(
+            f"Could not resolve path `{user_path}`: {exc}. "
+            "If this is on an external disk, make sure the volume is mounted "
+            "and accessible."
+        )
+        return
 
-    if not p.exists():
+    try:
+        path_exists = p.exists()
+    except OSError as exc:
+        st.error(
+            f"Cannot access `{user_path}`: {exc}. "
+            "External disks may need to be remounted, or this process may "
+            "lack permission to read the volume."
+        )
+        return
+
+    if not path_exists:
         st.error(f"Path does not exist: `{user_path}`")
         return
 

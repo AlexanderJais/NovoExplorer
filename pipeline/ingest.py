@@ -41,13 +41,35 @@ _FPKM_PATTERNS = ("gene_fpkm_matrix*", "FPKM*")
 _TPM_PATTERNS = ("gene_tpm_matrix*", "TPM*")
 
 
+def _safe_iterdir(base: Path) -> List[Path]:
+    """List ``base``'s children, returning [] on permission / I/O errors.
+
+    External disks (mounted under ``/Volumes``, ``/mnt``, ``/media``) and
+    network shares can raise ``PermissionError`` or ``OSError`` partway
+    through iteration. Swallowing those errors lets the pipeline keep
+    going on the parts of the tree that *are* readable.
+    """
+    try:
+        return sorted(base.iterdir())
+    except (PermissionError, OSError) as exc:
+        logger.warning("Cannot list %s: %s", base, exc)
+        return []
+
+
+def _safe_is_dir(p: Path) -> bool:
+    try:
+        return p.is_dir()
+    except OSError:
+        return False
+
+
 def _iglob_dirs(base: Path, patterns: tuple[str, ...]) -> List[Path]:
     """Return directories under *base* whose names match any pattern (case-insensitive)."""
     found: list[Path] = []
-    if not base.is_dir():
+    if not _safe_is_dir(base):
         return found
-    for child in sorted(base.iterdir()):
-        if not child.is_dir():
+    for child in _safe_iterdir(base):
+        if not _safe_is_dir(child):
             continue
         name_lower = child.name.lower()
         for pat in patterns:
@@ -68,10 +90,13 @@ def iglob_files(base: Path, patterns: tuple[str, ...]) -> List[Path]:
     Searches only the immediate directory (non-recursive).
     """
     found: list[Path] = []
-    if not base.is_dir():
+    if not _safe_is_dir(base):
         return found
-    for child in sorted(base.iterdir()):
-        if not child.is_file():
+    for child in _safe_iterdir(base):
+        try:
+            if not child.is_file():
+                continue
+        except OSError:
             continue
         name = child.name
         for pat in patterns:
@@ -91,7 +116,7 @@ def _find_files_prefer_all(comp_dir: Path, file_patterns: tuple[str, ...]) -> Li
     if files:
         return files
     reg_dirs = sorted(
-        [d for d in comp_dir.iterdir() if d.is_dir()],
+        [d for d in _safe_iterdir(comp_dir) if _safe_is_dir(d)],
         key=lambda d: (0 if d.name.lower() == "all" else 1, d.name.lower()),
     )
     for reg_dir in reg_dirs:
@@ -124,10 +149,18 @@ def _find_sample_info_file(base: Path) -> Optional[Path]:
 
 
 def sorted_walk(base: Path):
-    """os.walk replacement using pathlib, yielding (root, dirs, files) with sorted names."""
+    """os.walk replacement using pathlib, yielding (root, dirs, files) with sorted names.
+
+    Uses ``onerror`` so that unreadable subdirectories on external disks
+    (e.g. permission-denied or transient I/O errors) are logged and skipped
+    rather than silently truncating the walk.
+    """
     import os
 
-    for root, dirs, files in os.walk(base):
+    def _on_error(err: OSError) -> None:
+        logger.warning("Skipping unreadable path during walk: %s", err)
+
+    for root, dirs, files in os.walk(base, onerror=_on_error):
         dirs.sort()
         files.sort()
         yield root, dirs, files
@@ -147,9 +180,21 @@ def discover_novogene_structure(data_dir: str | Path) -> Dict[str, Any]:
         sample_info_file – Path or None
         discovered_files – flat list of every file found during the walk
     """
-    data_dir = Path(data_dir).resolve()
-    if not data_dir.is_dir():
-        logger.error("Data directory does not exist: %s", data_dir)
+    try:
+        data_dir = Path(data_dir).resolve()
+    except OSError as exc:
+        logger.error("Cannot resolve data directory %s: %s", data_dir, exc)
+        return {
+            "quant_dir": None,
+            "deg_dir": None,
+            "enrichment_dir": None,
+            "qc_dir": None,
+            "mapping_dir": None,
+            "sample_info_file": None,
+            "discovered_files": [],
+        }
+    if not _safe_is_dir(data_dir):
+        logger.error("Data directory does not exist or is unreadable: %s", data_dir)
         return {
             "quant_dir": None,
             "deg_dir": None,
@@ -170,8 +215,8 @@ def discover_novogene_structure(data_dir: str | Path) -> Dict[str, Any]:
 
     # Top-level and one-level-deep search for standard folders
     search_roots = [data_dir]
-    for child in sorted(data_dir.iterdir()):
-        if child.is_dir():
+    for child in _safe_iterdir(data_dir):
+        if _safe_is_dir(child):
             search_roots.append(child)
 
     def _first_match(patterns: tuple[str, ...]) -> Optional[Path]:
@@ -235,7 +280,7 @@ def parse_expression_matrices(quant_dir: str | Path | None) -> Dict[str, Optiona
 
     # Search both the directory itself and one level of subdirectories
     search_dirs = [quant_dir] + [
-        d for d in sorted(quant_dir.iterdir()) if d.is_dir()
+        d for d in _safe_iterdir(quant_dir) if _safe_is_dir(d)
     ]
 
     def _find_and_parse(patterns: tuple[str, ...], label: str) -> Optional[pd.DataFrame]:
@@ -315,14 +360,14 @@ def parse_deg_results(deg_dir: str | Path | None) -> Dict[str, pd.DataFrame]:
 
     # Collect comparison directories — unwrap numbered containers first.
     comparison_dirs: list[Path] = []
-    for subdir in sorted(deg_dir.iterdir()):
-        if not subdir.is_dir():
+    for subdir in _safe_iterdir(deg_dir):
+        if not _safe_is_dir(subdir):
             continue
         if is_container_dir(subdir):
             # Descend into numbered containers like 1.deglist/
             logger.info("  Entering container directory: %s", subdir.name)
-            for inner in sorted(subdir.iterdir()):
-                if inner.is_dir():
+            for inner in _safe_iterdir(subdir):
+                if _safe_is_dir(inner):
                     comparison_dirs.append(inner)
         else:
             comparison_dirs.append(subdir)
@@ -335,8 +380,8 @@ def parse_deg_results(deg_dir: str | Path | None) -> Dict[str, pd.DataFrame]:
         deg_files = iglob_files(comp_dir, _DEG_FILE_PATTERNS)
         if not deg_files:
             # Also search one level deeper (some deliveries nest further)
-            for nested in sorted(comp_dir.iterdir()):
-                if nested.is_dir():
+            for nested in _safe_iterdir(comp_dir):
+                if _safe_is_dir(nested):
                     deg_files = iglob_files(nested, _DEG_FILE_PATTERNS)
                     if deg_files:
                         break
@@ -386,8 +431,8 @@ def _enrich_deg_with_all_compare(
     # Find all_compare.xls
     all_compare_path = None
     search_dirs = [deg_dir]
-    for child in sorted(deg_dir.iterdir()):
-        if child.is_dir() and is_container_dir(child):
+    for child in _safe_iterdir(deg_dir):
+        if _safe_is_dir(child) and is_container_dir(child):
             search_dirs.append(child)
     for sdir in search_dirs:
         candidates = iglob_files(sdir, ("all_compare*",))
@@ -473,8 +518,8 @@ def _detect_enrichment_layout(enrichment_dir: Path) -> str:
         enrichment_dir/KEGG/{comparison}/{all|up|down}/*_KEGGenrich.xls
     """
     _DB_NAMES = {"go", "kegg", "disgenet", "do", "reactome", "ppi"}
-    for child in enrichment_dir.iterdir():
-        if child.is_dir() and child.name.lower() in _DB_NAMES:
+    for child in _safe_iterdir(enrichment_dir):
+        if _safe_is_dir(child) and child.name.lower() in _DB_NAMES:
             return "database_first"
     return "comparison_first"
 
@@ -503,8 +548,8 @@ def _parse_enrichment_comparison_first(
         # (node1, node2, score), not enrichment tables — skip them.
     }
 
-    for subdir in sorted(enrichment_dir.iterdir()):
-        if not subdir.is_dir():
+    for subdir in _safe_iterdir(enrichment_dir):
+        if not _safe_is_dir(subdir):
             continue
         comparison = subdir.name
         logger.info("  Processing enrichment comparison: %s", comparison)
@@ -591,8 +636,8 @@ def _parse_enrichment_database_first(
         db_dir = db_dirs[0]
         logger.info("  Processing database-first enrichment: %s (%s)", db_name, db_dir.name)
 
-        for comp_dir in sorted(db_dir.iterdir()):
-            if not comp_dir.is_dir():
+        for comp_dir in _safe_iterdir(db_dir):
+            if not _safe_is_dir(comp_dir):
                 continue
             comparison = comp_dir.name
             logger.info("    Comparison: %s", comparison)
@@ -730,8 +775,8 @@ def parse_ppi_results(
     ppi_root = ppi_dirs[0]
     logger.info("  Parsing PPI networks from: %s", ppi_root)
 
-    for comp_dir in sorted(ppi_root.iterdir()):
-        if not comp_dir.is_dir():
+    for comp_dir in _safe_iterdir(ppi_root):
+        if not _safe_is_dir(comp_dir):
             continue
         comparison = comp_dir.name
 

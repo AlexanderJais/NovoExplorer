@@ -221,22 +221,52 @@ def _all_gene_names(deg: dict[str, pd.DataFrame]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _list_subdirs(parent: Path) -> list[str]:
-    """Return sorted subdirectory names under *parent*."""
+def _safe_is_dir(p: Path) -> bool:
+    """Return True if *p* is a directory, tolerating I/O errors on external disks."""
     try:
-        return sorted(
-            d.name for d in parent.iterdir()
-            if d.is_dir() and not d.name.startswith(".")
-        )
-    except PermissionError:
+        return p.is_dir()
+    except OSError:
+        return False
+
+
+def _list_subdirs(parent: Path) -> list[str]:
+    """Return sorted subdirectory names under *parent*.
+
+    Tolerates ``PermissionError`` and ``OSError`` so that mounted external
+    disks (e.g. on ``/Volumes``, ``/mnt``, ``/media``) with unusual entries
+    or transient I/O errors don't break the folder browser.
+    """
+    try:
+        entries = list(parent.iterdir())
+    except (PermissionError, OSError):
         return []
+    names: list[str] = []
+    for d in entries:
+        if d.name.startswith("."):
+            continue
+        if _safe_is_dir(d):
+            names.append(d.name)
+    return sorted(names)
+
+
+def _external_disk_roots() -> list[Path]:
+    """Return existing mount-point roots commonly used for external disks."""
+    roots: list[Path] = []
+    for candidate in ("/Volumes", "/mnt", "/media", "/run/media"):
+        p = Path(candidate)
+        if _safe_is_dir(p):
+            roots.append(p)
+    return roots
 
 
 def _looks_like_novogene(p: Path) -> bool:
     """Quick check: does this folder contain Differential/ or Enrichment/?"""
     for child in ("Differential", "differential", "Enrichment", "enrichment"):
-        if (p / child).is_dir():
-            return True
+        try:
+            if (p / child).is_dir():
+                return True
+        except OSError:
+            continue
     return False
 
 
@@ -278,6 +308,12 @@ def _on_subfolder_click(subfolder_name: str):
     st.session_state["_path_input"] = new_path
 
 
+def _jump_to(path: str):
+    """Callback: jump the browser to *path*."""
+    st.session_state["browse_dir"] = path
+    st.session_state["_path_input"] = path
+
+
 # Sync text input default with browse_dir
 if "_path_input" not in st.session_state:
     st.session_state["_path_input"] = st.session_state["browse_dir"]
@@ -289,9 +325,24 @@ st.sidebar.text_input(
     help="Paste a full path and press Enter",
 )
 
+# Quick-jump shortcuts (home + external disk mount points)
+_shortcuts: list[tuple[str, str]] = [("🏠 Home", str(Path.home()))]
+for _root in _external_disk_roots():
+    _shortcuts.append((f"💾 {_root}", str(_root)))
+if len(_shortcuts) > 1:
+    st.sidebar.caption("Quick jump:")
+    _cols = st.sidebar.columns(min(len(_shortcuts), 3))
+    for _i, (_label, _path) in enumerate(_shortcuts):
+        with _cols[_i % len(_cols)]:
+            st.button(
+                _label, key=f"_jump_{_path}",
+                on_click=_jump_to, args=(_path,),
+                width="stretch",
+            )
+
 browse_path = Path(st.session_state["browse_dir"])
 
-if browse_path.is_dir():
+if _safe_is_dir(browse_path):
     # Show current path (may differ from text input during navigation)
     if str(browse_path) != st.session_state.get("_path_input", ""):
         st.sidebar.caption(f"📂 `{browse_path}`")
@@ -330,7 +381,7 @@ st.sidebar.divider()
 
 # Resolve selected data folder
 data_dir = st.session_state.get("data_dir", "")
-if not data_dir or not Path(data_dir).is_dir():
+if not data_dir or not _safe_is_dir(Path(data_dir)):
     st.title("Novogene RNA-Seq Explorer")
     st.info(
         "Navigate to your Novogene data folder using the sidebar browser, "
