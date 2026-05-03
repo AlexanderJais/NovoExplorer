@@ -37,6 +37,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from pipeline.utils import load_config  # noqa: E402
 from app.cache_utils import file_mtime_ns  # noqa: E402
+from app.file_utils import looks_like_novogene_delivery  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -175,42 +176,8 @@ def _init_session_state() -> None:
 # Interactive data picker (welcome / launcher screen)
 # ---------------------------------------------------------------------------
 
-def _safe_iterdir(p: Path) -> list[Path]:
-    """List children of *p*, returning [] on permission/IO errors.
-
-    External disks (network mounts, USB drives, encrypted volumes) can raise
-    ``PermissionError`` or ``OSError`` mid-iteration. We swallow those so the
-    welcome screen never crashes when pointed at an external drive.
-    """
-    try:
-        return list(p.iterdir())
-    except (PermissionError, OSError):
-        return []
-
-
-def _safe_is_dir(p: Path) -> bool:
-    try:
-        return p.is_dir()
-    except OSError:
-        return False
-
-
-def _looks_like_novogene_delivery(folder: Path) -> bool:
-    """Return True if *folder* contains directories matching Novogene patterns."""
-    if not _safe_is_dir(folder):
-        return False
-    names = {c.name.lower() for c in _safe_iterdir(folder) if _safe_is_dir(c)}
-    # Also check one level down (Novogene sometimes nests under a project dir)
-    for child in _safe_iterdir(folder):
-        if _safe_is_dir(child):
-            names |= {gc.name.lower() for gc in _safe_iterdir(child) if _safe_is_dir(gc)}
-    markers = {"differential", "enrichment", "quantification"}
-    # Match against known Novogene patterns
-    for n in names:
-        for pat in ("diff", "deg", "enrich", "quant", "readcount", "fpkm"):
-            if n.startswith(pat):
-                return True
-    return bool(markers & names)
+# safe_iterdir / safe_is_dir / looks_like_novogene_delivery now live in
+# app/file_utils so the same helpers back novogene_explorer.py too.
 
 
 def _run_pipeline_in_app(config: dict) -> str | None:
@@ -316,7 +283,7 @@ def _show_data_picker() -> None:
         return
 
     # --- Case 3: raw Novogene delivery folder -> offer to run pipeline ---
-    if p.is_dir() and _looks_like_novogene_delivery(p):
+    if p.is_dir() and looks_like_novogene_delivery(p):
         st.session_state["_picker_path"] = user_path
         _show_pipeline_launcher(p)
         return

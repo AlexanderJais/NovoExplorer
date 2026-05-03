@@ -90,6 +90,12 @@ from pipeline.utils import (
     standardize_enrichment_columns,
 )
 from app.cache_utils import file_mtime_ns
+from app.file_utils import (
+    external_disk_roots,
+    list_subdirs,
+    looks_like_novogene_shallow,
+    safe_is_dir,
+)
 try:
     from plotting.ppi_network import build_ppi_network, build_ego_network
     _HAS_NETWORKX = True
@@ -222,53 +228,9 @@ def _all_gene_names(deg: dict[str, pd.DataFrame]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _safe_is_dir(p: Path) -> bool:
-    """Return True if *p* is a directory, tolerating I/O errors on external disks."""
-    try:
-        return p.is_dir()
-    except OSError:
-        return False
-
-
-def _list_subdirs(parent: Path) -> list[str]:
-    """Return sorted subdirectory names under *parent*.
-
-    Tolerates ``PermissionError`` and ``OSError`` so that mounted external
-    disks (e.g. on ``/Volumes``, ``/mnt``, ``/media``) with unusual entries
-    or transient I/O errors don't break the folder browser.
-    """
-    try:
-        entries = list(parent.iterdir())
-    except (PermissionError, OSError):
-        return []
-    names: list[str] = []
-    for d in entries:
-        if d.name.startswith("."):
-            continue
-        if _safe_is_dir(d):
-            names.append(d.name)
-    return sorted(names)
-
-
-def _external_disk_roots() -> list[Path]:
-    """Return existing mount-point roots commonly used for external disks."""
-    roots: list[Path] = []
-    for candidate in ("/Volumes", "/mnt", "/media", "/run/media"):
-        p = Path(candidate)
-        if _safe_is_dir(p):
-            roots.append(p)
-    return roots
-
-
-def _looks_like_novogene(p: Path) -> bool:
-    """Quick check: does this folder contain Differential/ or Enrichment/?"""
-    for child in ("Differential", "differential", "Enrichment", "enrichment"):
-        try:
-            if (p / child).is_dir():
-                return True
-        except OSError:
-            continue
-    return False
+# Filesystem helpers (safe_is_dir, list_subdirs, external_disk_roots,
+# looks_like_novogene_shallow) live in app/file_utils so they stay in
+# sync with the pipeline-backed launcher in app/app.py.
 
 
 st.sidebar.title("Novogene Explorer")
@@ -328,7 +290,7 @@ st.sidebar.text_input(
 
 # Quick-jump shortcuts (home + external disk mount points)
 _shortcuts: list[tuple[str, str]] = [("🏠 Home", str(Path.home()))]
-for _root in _external_disk_roots():
+for _root in external_disk_roots():
     _shortcuts.append((f"💾 {_root}", str(_root)))
 if len(_shortcuts) > 1:
     st.sidebar.caption("Quick jump:")
@@ -343,7 +305,7 @@ if len(_shortcuts) > 1:
 
 browse_path = Path(st.session_state["browse_dir"])
 
-if _safe_is_dir(browse_path):
+if safe_is_dir(browse_path):
     # Show current path (may differ from text input during navigation)
     if str(browse_path) != st.session_state.get("_path_input", ""):
         st.sidebar.caption(f"📂 `{browse_path}`")
@@ -359,16 +321,16 @@ if _safe_is_dir(browse_path):
             on_click=_use_folder, width="stretch",
         )
 
-    if _looks_like_novogene(browse_path):
+    if looks_like_novogene_shallow(browse_path):
         st.sidebar.success("Novogene data detected")
 
     # List subdirectories as clickable buttons
-    subdirs = _list_subdirs(browse_path)
+    subdirs = list_subdirs(browse_path)
     if subdirs:
         st.sidebar.caption("Subfolders:")
         for d in subdirs:
             child = browse_path / d
-            label = f"📊 {d}" if _looks_like_novogene(child) else f"📁 {d}"
+            label = f"📊 {d}" if looks_like_novogene_shallow(child) else f"📁 {d}"
             st.sidebar.button(
                 label, key=f"_nav_{d}",
                 on_click=_on_subfolder_click, args=(d,),
@@ -382,7 +344,7 @@ st.sidebar.divider()
 
 # Resolve selected data folder
 data_dir = st.session_state.get("data_dir", "")
-if not data_dir or not _safe_is_dir(Path(data_dir)):
+if not data_dir or not safe_is_dir(Path(data_dir)):
     st.title("Novogene RNA-Seq Explorer")
     st.info(
         "Navigate to your Novogene data folder using the sidebar browser, "
