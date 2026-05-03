@@ -544,13 +544,22 @@ def main() -> None:
                 core_df = signatures_data.get("core")
 
             if core_df is None or (isinstance(core_df, pd.DataFrame) and core_df.empty):
-                min_n = st.slider(
-                    "Minimum comparisons",
-                    min_value=2,
-                    max_value=max(2, len(comparisons)),
-                    value=2,
-                    key="core_min_n",
-                )
+                # Only show the slider when there's a real range to choose
+                # from; Streamlit rejects sliders with min_value == max_value.
+                if len(comparisons) > 2:
+                    min_n = st.slider(
+                        "Minimum comparisons",
+                        min_value=2,
+                        max_value=len(comparisons),
+                        value=2,
+                        key="core_min_n",
+                    )
+                else:
+                    min_n = 2
+                    st.caption(
+                        f"Requiring overlap across all {len(comparisons)} "
+                        "comparison(s)."
+                    )
                 core_df = _find_core_signatures_from_enrichment(
                     enrichment_data,
                     min_comparisons=min_n,

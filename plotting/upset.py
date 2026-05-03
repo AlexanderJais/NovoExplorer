@@ -50,7 +50,7 @@ def create_upset_data(
         if "padj" not in df.columns or "log2fc" not in df.columns:
             sig_sets[name] = set(df["gene_name"]) if "gene_name" in df.columns else set(df.index.astype(str))
             continue
-        mask = (df["padj"] < padj_threshold) & (df["log2fc"].abs() >= log2fc_threshold)
+        mask = (df["padj"] <= padj_threshold) & (df["log2fc"].abs() >= log2fc_threshold)
         sig_sets[name] = set(df.loc[mask, "gene_name"])
 
     all_genes = sorted(set().union(*sig_sets.values()))
