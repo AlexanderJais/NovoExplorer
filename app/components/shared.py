@@ -11,6 +11,8 @@ create_expression_bar, fmt_count, fmt_pvalue, fmt_fc, table_height.
 
 from __future__ import annotations
 
+import html
+import re
 import sys
 from pathlib import Path
 
@@ -232,17 +234,48 @@ def table_height(n_rows: int, max_height: int = 400) -> int:
 # ---------------------------------------------------------------------------
 
 
+_ICON_CHARS = {
+    "info": "ℹ️",
+    "search": "🔍",
+    "chart": "📊",
+    "gene": "🧬",
+    "warning": "⚠️",
+}
+
+# Conservative whitelist for color values interpolated into inline CSS:
+# 3/4/6/8-digit hex with the leading #. Anything else falls back to the
+# default so an attacker can't inject a closing quote and break out of
+# the style attribute.
+_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{3,8}$")
+
+
+def _safe_color(color: str, fallback: str = "#0072B2") -> str:
+    return color if _COLOR_RE.fullmatch(color) else fallback
+
+
 def render_empty_state(message: str, suggestion: str | None = None, icon: str = "info") -> None:
-    """Render a styled empty-state placeholder."""
-    _ICONS = {"info": "ℹ️", "search": "🔍", "chart": "📊", "gene": "🧬", "warning": "⚠️"}
-    icon_char = _ICONS.get(icon, icon)
+    """Render a styled empty-state placeholder.
+
+    *message* / *suggestion* may include user-controlled content (gene
+    names, comparison names) so we HTML-escape them before interpolation
+    even though Streamlit normally runs locally; defence in depth is
+    cheaper than auditing every caller.
+    """
+    icon_char = _ICON_CHARS.get(icon)
+    if icon_char is None:
+        # Custom icons fall back to escape; the dict above covers the
+        # known emoji set.
+        icon_char = html.escape(icon)
     suggestion_html = ""
     if suggestion:
-        suggestion_html = f'<div style="font-size:0.82rem; color:#999; margin-top:0.5rem;">{suggestion}</div>'
+        suggestion_html = (
+            '<div style="font-size:0.82rem; color:#999; margin-top:0.5rem;">'
+            f'{html.escape(suggestion)}</div>'
+        )
     st.markdown(
         f"""<div style="text-align:center; padding:2.5rem 1rem; color:#888;">
             <div style="font-size:2.5rem; margin-bottom:0.5rem;">{icon_char}</div>
-            <div style="font-size:0.95rem; font-weight:500; color:#666;">{message}</div>
+            <div style="font-size:0.95rem; font-weight:500; color:#666;">{html.escape(message)}</div>
             {suggestion_html}
         </div>""",
         unsafe_allow_html=True,
@@ -250,11 +283,17 @@ def render_empty_state(message: str, suggestion: str | None = None, icon: str = 
 
 
 def render_stat_badge(label: str, value: str | int, color: str = "#0072B2") -> None:
-    """Render an inline stat badge."""
+    """Render an inline stat badge.
+
+    *label* / *value* are HTML-escaped and *color* is constrained to
+    hex literals before being interpolated into inline CSS, so callers
+    don't have to remember to sanitise.
+    """
+    safe_color = _safe_color(color)
     st.markdown(
-        f'<span style="display:inline-block; background:{color}15; color:{color}; '
-        f'border:1px solid {color}40; border-radius:6px; padding:0.2rem 0.6rem; '
+        f'<span style="display:inline-block; background:{safe_color}15; color:{safe_color}; '
+        f'border:1px solid {safe_color}40; border-radius:6px; padding:0.2rem 0.6rem; '
         f'font-size:0.78rem; font-weight:600; margin-right:0.4rem;">'
-        f'{label}: {value}</span>',
+        f'{html.escape(str(label))}: {html.escape(str(value))}</span>',
         unsafe_allow_html=True,
     )

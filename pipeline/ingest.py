@@ -295,6 +295,8 @@ def parse_expression_matrices(quant_dir: str | Path | None) -> Dict[str, Optiona
                         logger.info("    -> %d genes x %d samples", df.shape[0], df.shape[1])
                         return df
                     logger.warning("    -> empty or None result for %s", fpath)
+                except OSError as exc:
+                    logger.error("    -> could not read %s: %s", fpath, exc)
                 except Exception:
                     logger.warning("    -> failed to parse %s", fpath, exc_info=True)
                 return None
@@ -403,6 +405,8 @@ def parse_deg_results(deg_dir: str | Path | None) -> Dict[str, pd.DataFrame]:
             df = standardize_deg_columns(df)
             results[comparison] = df
             logger.info("    -> %d genes", len(df))
+        except OSError as exc:
+            logger.error("    -> could not read %s: %s", fpath, exc)
         except Exception:
             logger.warning("    -> failed to parse %s", fpath, exc_info=True)
 
@@ -445,6 +449,9 @@ def _enrich_deg_with_all_compare(
     logger.info("  Found all_compare file: %s", all_compare_path)
     try:
         ac_df = read_table_flexible(all_compare_path)
+    except OSError as exc:
+        logger.error("  Could not read all_compare file %s: %s", all_compare_path, exc)
+        return deg_results
     except Exception:
         logger.warning("  Failed to parse all_compare file", exc_info=True)
         return deg_results
@@ -578,6 +585,8 @@ def _parse_enrichment_comparison_first(
                     logger.info("      -> %d terms", len(df))
                 else:
                     logger.warning("      -> empty or None result for %s", fpath)
+            except OSError as exc:
+                logger.error("      -> could not read %s: %s", fpath, exc)
             except Exception:
                 logger.warning("      -> failed to parse %s", fpath, exc_info=True)
 
@@ -660,6 +669,8 @@ def _parse_enrichment_database_first(
                     logger.info("        -> %d terms", len(df))
                 else:
                     logger.warning("        -> empty or None result for %s", fpath)
+            except OSError as exc:
+                logger.error("        -> could not read %s: %s", fpath, exc)
             except Exception:
                 logger.warning("        -> failed to parse %s", fpath, exc_info=True)
 
@@ -790,6 +801,9 @@ def parse_ppi_results(
         logger.info("    PPI %s: %s", comparison, fpath)
         try:
             df = read_table_flexible(fpath)
+        except OSError as exc:
+            logger.error("    Could not read PPI file %s: %s", fpath, exc)
+            continue
         except Exception:
             logger.warning("    Failed to parse PPI file: %s", fpath, exc_info=True)
             continue
@@ -866,6 +880,9 @@ def parse_sample_info(file_path: str | Path | None) -> Optional[pd.DataFrame]:
     logger.info("Parsing sample info: %s", file_path)
     try:
         df = read_table_flexible(file_path)
+    except OSError as exc:
+        logger.error("Could not read sample info file %s: %s", file_path, exc)
+        return None
     except Exception:
         logger.warning("Failed to read sample info file: %s", file_path, exc_info=True)
         return None
@@ -903,8 +920,14 @@ def parse_sample_info(file_path: str | Path | None) -> Optional[pd.DataFrame]:
 
     result = df[[sample_col, group_col]].copy()
     result.columns = ["sample_id", "group"]
+    # Drop rows with NaN in either key column before astype(str), otherwise
+    # NaN gets coerced to the literal string "nan" and a junk row leaks into
+    # the sample table.
+    result = result.dropna(subset=["sample_id", "group"])
     result["sample_id"] = result["sample_id"].astype(str).str.strip()
     result["group"] = result["group"].astype(str).str.strip()
+    # Also drop rows whose key columns were whitespace-only.
+    result = result[(result["sample_id"] != "") & (result["group"] != "")]
 
     logger.info("  -> %d samples in %d groups", len(result), result["group"].nunique())
     return result

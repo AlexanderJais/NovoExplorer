@@ -70,9 +70,19 @@ def run_pipeline(config: Dict[str, Any]) -> None:
     from pipeline import ingest, normalize, qc, diffexp, similarity, signatures, persistence
 
     data_dir = config.get("data_dir", ".")
-    output_dir = config.get("output_dir", "results")
     organism = config.get("organism", "human")
-    output_file = str(Path(output_dir) / "novoexplorer_results.h5")
+
+    # Resolve output_dir. Treat relative paths as relative to data_dir
+    # rather than cwd: users running ``python run_pipeline.py --config
+    # /elsewhere/config.yaml`` expect ``output_dir: results`` to land
+    # next to the data, not next to wherever they happened to be
+    # standing. Absolute paths are honoured as-is.
+    output_dir_cfg = config.get("output_dir", "results")
+    output_dir_path = Path(output_dir_cfg)
+    if not output_dir_path.is_absolute():
+        output_dir_path = Path(data_dir) / output_dir_path
+    output_dir = str(output_dir_path)
+    output_file = str(output_dir_path / "novoexplorer_results.h5")
 
     # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)

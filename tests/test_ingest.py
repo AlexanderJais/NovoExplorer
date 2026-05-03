@@ -311,6 +311,22 @@ class TestParseSampleInfo:
     def test_missing_file_returns_none(self, tmp_path: Path) -> None:
         assert parse_sample_info(tmp_path / "nonexistent.txt") is None
 
+    def test_drops_nan_rows(self, tmp_path: Path) -> None:
+        # Previously, NaN sample IDs got coerced to the string "nan" by
+        # astype(str), so a junk row leaked into the result. Drop them.
+        p = tmp_path / "sample_info.txt"
+        p.write_text(
+            "sample_id\tgroup\n"
+            "S1\tA\n"
+            "\tB\n"          # missing sample_id -> dropped
+            "S3\t\n"          # missing group -> dropped
+            "S4\tB\n"
+        )
+        out = parse_sample_info(p)
+        assert out is not None
+        assert list(out["sample_id"]) == ["S1", "S4"]
+        assert "nan" not in out["sample_id"].values
+
 
 # -----------------------------------------------------------------------
 # 6. infer_groups_from_comparisons

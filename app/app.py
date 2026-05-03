@@ -145,9 +145,15 @@ def _init_from_config(config_path: str) -> bool:
         st.error(f"Failed to load configuration: **{type(exc).__name__}** -- {exc}")
         return False
 
-    output_dir = config.get("output_dir", "results")
+    output_dir_cfg = config.get("output_dir", "results")
     results_file = config.get("results_file", _DEFAULT_RESULTS_FILENAME)
-    results_path = str(Path(output_dir) / results_file)
+    # Match run_pipeline.run_pipeline: relative output_dir is resolved
+    # against data_dir, not cwd, so the results path the app loads
+    # matches the path the pipeline actually wrote to.
+    output_dir_path = Path(output_dir_cfg)
+    if not output_dir_path.is_absolute():
+        output_dir_path = Path(config.get("data_dir", ".")) / output_dir_path
+    results_path = str(output_dir_path / results_file)
 
     st.session_state["config"] = config
     st.session_state["config_path"] = config_path
@@ -195,8 +201,12 @@ def _run_pipeline_in_app(config: dict) -> str | None:
         datefmt="%H:%M:%S",
     )
 
-    output_dir = config.get("output_dir", "results")
-    results_path = str(Path(output_dir) / _DEFAULT_RESULTS_FILENAME)
+    # Mirror run_pipeline's relative-to-data_dir resolution so we read
+    # the file from where the pipeline actually wrote it.
+    output_dir_path = Path(config.get("output_dir", "results"))
+    if not output_dir_path.is_absolute():
+        output_dir_path = Path(config.get("data_dir", ".")) / output_dir_path
+    results_path = str(output_dir_path / _DEFAULT_RESULTS_FILENAME)
 
     try:
         run_pipeline(config)
