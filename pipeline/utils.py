@@ -188,6 +188,82 @@ def _rename_matched(df: pd.DataFrame, standard_name: str,
     return df
 
 
+_DEG_COLUMN_CANDIDATES: dict[str, list[str]] = {
+    "gene_id": [
+        "gene_id", "Geneid", "Gene ID", "Ensembl_ID",
+        "ensembl_gene_id", "Gene", "GeneID", "ID",
+    ],
+    "gene_name": [
+        "gene_name", "Gene Name", "GeneName", "Symbol",
+        "gene_symbol", "SYMBOL", "Description",
+    ],
+    "log2fc": [
+        "log2FoldChange", "log2FC", "logFC", "log2(FC)",
+        "FoldChange(log2)",
+    ],
+    "pvalue": ["pvalue", "PValue", "P-value", "pval"],
+    "padj": [
+        "padj", "FDR", "adj.P.Val", "q_value", "qvalue",
+        "BH", "p_adjusted",
+    ],
+    "basemean": [
+        "baseMean", "basemean", "AveExpr", "meanExpression",
+    ],
+    "regulation": [
+        "regulation", "Regulation", "Direction", "regulate",
+    ],
+    "tf_family": [
+        "tf_family", "TF_family", "gene_tf_family",
+    ],
+}
+
+_ENRICHMENT_COLUMN_CANDIDATES: dict[str, list[str]] = {
+    "term_id": [
+        "ID", "term_id", "GO_ID", "GOID",
+        "KEGG_ID", "KEGGID", "PathwayID",
+        "DisGeNETID", "DOID", "ReactomeID",
+    ],
+    "term_name": [
+        "Description", "Pathway",
+        "pathway_name", "KEGG_pathway", "term_name",
+        "Term", "GO_term",
+    ],
+    "pvalue": ["pvalue", "PValue", "P-value", "Pvalue"],
+    "padj": [
+        "padj", "FDR", "q_value", "Adjusted P-value",
+        "corrected_pvalue",
+    ],
+    "gene_count": [
+        "Count", "count", "Gene_count", "gene_count",
+        "nGenes",
+    ],
+    "gene_ratio": [
+        "GeneRatio", "gene_ratio", "Rich_Factor",
+        "Rich Factor", "richFactor",
+    ],
+    "genes": [
+        "geneName", "Genes", "gene_list", "Core_enrichment",
+        "geneID",
+    ],
+}
+
+
+def _apply_column_candidates(
+    df: pd.DataFrame,
+    candidates: dict[str, list[str]],
+) -> pd.DataFrame:
+    """Rename ``df`` columns using a ``{standard: [aliases]}`` mapping.
+
+    Returns a fresh copy with each known alias renamed to its canonical
+    standard name. Columns not found in any alias list are left
+    untouched.
+    """
+    df = df.copy()
+    for standard_name, aliases in candidates.items():
+        df = _rename_matched(df, standard_name, aliases)
+    return df
+
+
 def standardize_deg_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Rename DEG table columns to standard names.
 
@@ -204,41 +280,7 @@ def standardize_deg_columns(df: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         DataFrame with renamed columns (copy).
     """
-    df = df.copy()
-
-    column_candidates = {
-        "gene_id": [
-            "gene_id", "Geneid", "Gene ID", "Ensembl_ID",
-            "ensembl_gene_id", "Gene", "GeneID", "ID",
-        ],
-        "gene_name": [
-            "gene_name", "Gene Name", "GeneName", "Symbol",
-            "gene_symbol", "SYMBOL", "Description",
-        ],
-        "log2fc": [
-            "log2FoldChange", "log2FC", "logFC", "log2(FC)",
-            "FoldChange(log2)",
-        ],
-        "pvalue": ["pvalue", "PValue", "P-value", "pval"],
-        "padj": [
-            "padj", "FDR", "adj.P.Val", "q_value", "qvalue",
-            "BH", "p_adjusted",
-        ],
-        "basemean": [
-            "baseMean", "basemean", "AveExpr", "meanExpression",
-        ],
-        "regulation": [
-            "regulation", "Regulation", "Direction", "regulate",
-        ],
-        "tf_family": [
-            "tf_family", "TF_family", "gene_tf_family",
-        ],
-    }
-
-    for standard_name, candidates in column_candidates.items():
-        df = _rename_matched(df, standard_name, candidates)
-
-    return df
+    return _apply_column_candidates(df, _DEG_COLUMN_CANDIDATES)
 
 
 def standardize_enrichment_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -258,42 +300,7 @@ def standardize_enrichment_columns(df: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         DataFrame with renamed columns (copy).
     """
-    df = df.copy()
-
-    column_candidates = {
-        "term_id": [
-            "ID", "term_id", "GO_ID", "GOID",
-            "KEGG_ID", "KEGGID", "PathwayID",
-            "DisGeNETID", "DOID", "ReactomeID",
-        ],
-        "term_name": [
-            "Description", "Pathway",
-            "pathway_name", "KEGG_pathway", "term_name",
-            "Term", "GO_term",
-        ],
-        "pvalue": ["pvalue", "PValue", "P-value", "Pvalue"],
-        "padj": [
-            "padj", "FDR", "q_value", "Adjusted P-value",
-            "corrected_pvalue",
-        ],
-        "gene_count": [
-            "Count", "count", "Gene_count", "gene_count",
-            "nGenes",
-        ],
-        "gene_ratio": [
-            "GeneRatio", "gene_ratio", "Rich_Factor",
-            "Rich Factor", "richFactor",
-        ],
-        "genes": [
-            "geneName", "Genes", "gene_list", "Core_enrichment",
-            "geneID",
-        ],
-    }
-
-    for standard_name, candidates in column_candidates.items():
-        df = _rename_matched(df, standard_name, candidates)
-
-    return df
+    return _apply_column_candidates(df, _ENRICHMENT_COLUMN_CANDIDATES)
 
 
 # ===================================================================

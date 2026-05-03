@@ -47,7 +47,8 @@ def get_data_path() -> str:
         Absolute path to the ``novoexplorer_results.h5`` file.  Falls back to
         a default under ``results/`` if session state is empty.
     """
-    return st.session_state.get("results_path", _DEFAULT_DATA_PATH)
+    from app.session import KEY_RESULTS_PATH
+    return st.session_state.get(KEY_RESULTS_PATH, _DEFAULT_DATA_PATH)
 
 
 def check_data_path(data_path: str) -> bool:

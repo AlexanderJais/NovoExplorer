@@ -64,7 +64,7 @@ def create_upset_data(
 def create_upset_plot(
     binary_matrix: pd.DataFrame,
     title: str = "",
-):
+) -> tuple[plt.Figure, plt.Axes]:
     """Build an UpSet-style plot using matplotlib.
 
     The plot consists of three aligned panels:

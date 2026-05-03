@@ -191,7 +191,7 @@ def create_volcano_matplotlib(
     log2fc_threshold: float = 1.0,
     title: str = "",
     top_n_labels: int = 10,
-):
+) -> tuple[plt.Figure, plt.Axes]:
     """Create a static matplotlib volcano plot.
 
     Parameters

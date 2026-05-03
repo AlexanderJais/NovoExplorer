@@ -113,7 +113,7 @@ def create_ma_plot_matplotlib(
     padj_threshold: float = 0.05,
     log2fc_threshold: float = 1.0,
     title: str = "",
-):
+) -> tuple[plt.Figure, plt.Axes]:
     """Create a static matplotlib MA plot.
 
     Parameters

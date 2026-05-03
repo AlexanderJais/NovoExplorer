@@ -37,7 +37,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 # ---------------------------------------------------------------------------
 
 class _SessionLogHandler(logging.Handler):
-    """Logging handler that appends records to ``st.session_state["_log"]``."""
+    """Logging handler that appends records to ``st.session_state[KEY_LOG]``."""
 
     _FMT = logging.Formatter(
         fmt="%(asctime)s  %(levelname)-7s  %(name)s: %(message)s",
@@ -65,14 +65,14 @@ def _install_log_handler() -> None:
     for logger_name in ("pipeline.ingest", "pipeline.utils"):
         lg = logging.getLogger(logger_name)
         lg.addHandler(handler)
-    st.session_state["_log_handler_installed"] = True
+    st.session_state[KEY_LOG_HANDLER_INSTALLED] = True
 
 
 _install_log_handler()
 
 # Ensure a log list always exists
 if "_log" not in st.session_state:
-    st.session_state["_log"] = []
+    st.session_state[KEY_LOG] = []
 
 
 from pipeline.ingest import (
@@ -95,6 +95,13 @@ from app.file_utils import (
     list_subdirs,
     looks_like_novogene_shallow,
     safe_is_dir,
+)
+from app.session import (
+    KEY_BROWSE_DIR,
+    KEY_DATA_DIR,
+    KEY_LOG,
+    KEY_LOG_HANDLER_INSTALLED,
+    KEY_PATH_INPUT,
 )
 try:
     from plotting.ppi_network import build_ppi_network, build_ego_network
@@ -238,9 +245,9 @@ st.sidebar.title("Novogene Explorer")
 # Determine initial path: CLI arg > session state > home directory
 _cli_path = sys.argv[-1] if len(sys.argv) > 1 and Path(sys.argv[-1]).is_dir() else ""
 if "data_dir" not in st.session_state:
-    st.session_state["data_dir"] = _cli_path
+    st.session_state[KEY_DATA_DIR] = _cli_path
 if "browse_dir" not in st.session_state:
-    st.session_state["browse_dir"] = (
+    st.session_state[KEY_BROWSE_DIR] = (
         _cli_path if _cli_path else str(Path.home())
     )
 
@@ -250,36 +257,36 @@ st.sidebar.subheader("Select data folder")
 
 def _on_path_change():
     """Callback: user typed/pasted a new path in the text input."""
-    st.session_state["browse_dir"] = st.session_state["_path_input"]
+    st.session_state[KEY_BROWSE_DIR] = st.session_state[KEY_PATH_INPUT]
 
 
 def _go_up():
     """Callback: navigate to parent directory."""
-    st.session_state["browse_dir"] = str(Path(st.session_state["browse_dir"]).parent)
-    st.session_state["_path_input"] = st.session_state["browse_dir"]
+    st.session_state[KEY_BROWSE_DIR] = str(Path(st.session_state[KEY_BROWSE_DIR]).parent)
+    st.session_state[KEY_PATH_INPUT] = st.session_state[KEY_BROWSE_DIR]
 
 
 def _use_folder():
     """Callback: confirm current browse_dir as the data folder."""
-    st.session_state["data_dir"] = st.session_state["browse_dir"]
+    st.session_state[KEY_DATA_DIR] = st.session_state[KEY_BROWSE_DIR]
 
 
 def _on_subfolder_click(subfolder_name: str):
     """Callback: navigate into a subfolder."""
-    new_path = str(Path(st.session_state["browse_dir"]) / subfolder_name)
-    st.session_state["browse_dir"] = new_path
-    st.session_state["_path_input"] = new_path
+    new_path = str(Path(st.session_state[KEY_BROWSE_DIR]) / subfolder_name)
+    st.session_state[KEY_BROWSE_DIR] = new_path
+    st.session_state[KEY_PATH_INPUT] = new_path
 
 
 def _jump_to(path: str):
     """Callback: jump the browser to *path*."""
-    st.session_state["browse_dir"] = path
-    st.session_state["_path_input"] = path
+    st.session_state[KEY_BROWSE_DIR] = path
+    st.session_state[KEY_PATH_INPUT] = path
 
 
 # Sync text input default with browse_dir
 if "_path_input" not in st.session_state:
-    st.session_state["_path_input"] = st.session_state["browse_dir"]
+    st.session_state[KEY_PATH_INPUT] = st.session_state[KEY_BROWSE_DIR]
 
 st.sidebar.text_input(
     "Folder path",
@@ -303,11 +310,11 @@ if len(_shortcuts) > 1:
                 width="stretch",
             )
 
-browse_path = Path(st.session_state["browse_dir"])
+browse_path = Path(st.session_state[KEY_BROWSE_DIR])
 
 if safe_is_dir(browse_path):
     # Show current path (may differ from text input during navigation)
-    if str(browse_path) != st.session_state.get("_path_input", ""):
+    if str(browse_path) != st.session_state.get(KEY_PATH_INPUT, ""):
         st.sidebar.caption(f"📂 `{browse_path}`")
 
     # Action buttons
@@ -337,13 +344,13 @@ if safe_is_dir(browse_path):
                 width="stretch",
             )
 else:
-    if st.session_state["browse_dir"]:
+    if st.session_state[KEY_BROWSE_DIR]:
         st.sidebar.warning("Path does not exist.")
 
 st.sidebar.divider()
 
 # Resolve selected data folder
-data_dir = st.session_state.get("data_dir", "")
+data_dir = st.session_state.get(KEY_DATA_DIR, "")
 if not data_dir or not safe_is_dir(Path(data_dir)):
     st.title("Novogene RNA-Seq Explorer")
     st.info(
@@ -384,7 +391,7 @@ if sample_info is not None and "group" in sample_info.columns:
 
 st.sidebar.divider()
 with st.sidebar.expander("Log", expanded=False):
-    log_lines = st.session_state.get("_log", [])
+    log_lines = st.session_state.get(KEY_LOG, [])
     if log_lines:
         full_log = "\n".join(log_lines)
         st.code(full_log, language="log")
@@ -400,7 +407,7 @@ with st.sidebar.expander("Log", expanded=False):
             )
         with col_clear:
             if st.button("Clear log", key="clear_log", width="stretch"):
-                st.session_state["_log"] = []
+                st.session_state[KEY_LOG] = []
                 st.rerun()
     else:
         st.caption("No log messages yet.")

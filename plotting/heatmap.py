@@ -73,7 +73,7 @@ def create_clustered_heatmap(
     genes: list[str] | None = None,
     n_top_genes: int = 50,
     title: str = "",
-):
+) -> sns.matrix.ClusterGrid:
     """Create a clustered heatmap using seaborn.
 
     Parameters

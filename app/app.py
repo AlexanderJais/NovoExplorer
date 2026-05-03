@@ -38,6 +38,12 @@ if str(_PROJECT_ROOT) not in sys.path:
 from pipeline.utils import load_config  # noqa: E402
 from app.cache_utils import file_mtime_ns  # noqa: E402
 from app.file_utils import looks_like_novogene_delivery  # noqa: E402
+from app.session import (  # noqa: E402
+    KEY_CONFIG,
+    KEY_CONFIG_PATH,
+    KEY_PICKER_PATH,
+    KEY_RESULTS_PATH,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -155,9 +161,9 @@ def _init_from_config(config_path: str) -> bool:
         output_dir_path = Path(config.get("data_dir", ".")) / output_dir_path
     results_path = str(output_dir_path / results_file)
 
-    st.session_state["config"] = config
-    st.session_state["config_path"] = config_path
-    st.session_state["results_path"] = results_path
+    st.session_state[KEY_CONFIG] = config
+    st.session_state[KEY_CONFIG_PATH] = config_path
+    st.session_state[KEY_RESULTS_PATH] = results_path
     return True
 
 
@@ -238,7 +244,7 @@ def _show_data_picker() -> None:
     with col1:
         user_path = st.text_input(
             "Data path",
-            value=st.session_state.get("_picker_path", ""),
+            value=st.session_state.get(KEY_PICKER_PATH, ""),
             placeholder="/path/to/novogene/delivery  or  /path/to/results.h5",
             key="_picker_input",
         )
@@ -283,12 +289,12 @@ def _show_data_picker() -> None:
     # --- Case 2: existing HDF5 results ---
     results_path = _resolve_results_path(user_path)
     if results_path is not None:
-        st.session_state["config"] = {
+        st.session_state[KEY_CONFIG] = {
             "project_name": p.parent.name if p.is_file() else p.name,
             "organism": "human",
         }
-        st.session_state["results_path"] = results_path
-        st.session_state["_picker_path"] = user_path
+        st.session_state[KEY_RESULTS_PATH] = results_path
+        st.session_state[KEY_PICKER_PATH] = user_path
         st.rerun()
         return
 
@@ -362,8 +368,8 @@ def _show_pipeline_launcher(data_dir: Path) -> None:
 
             if results_path is not None:
                 status.update(label="Pipeline complete!", state="complete")
-                st.session_state["config"] = config
-                st.session_state["results_path"] = results_path
+                st.session_state[KEY_CONFIG] = config
+                st.session_state[KEY_RESULTS_PATH] = results_path
                 st.rerun()
             else:
                 status.update(label="Pipeline failed", state="error")
@@ -384,7 +390,7 @@ with st.sidebar:
     st.caption("RNA-Seq Analysis Platform")
 
     # Project info card
-    cfg = st.session_state.get("config", {})
+    cfg = st.session_state.get(KEY_CONFIG, {})
     if cfg:
         project_name = html.escape(cfg.get("project_name", cfg.get("data_dir", "Unknown")))
         organism = html.escape(cfg.get("organism", "human").capitalize())

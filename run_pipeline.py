@@ -17,8 +17,9 @@ import logging
 import os
 import sys
 import time
+import types
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import pandas as pd
 
@@ -31,7 +32,7 @@ logger = setup_logger("run_pipeline")
 # Helper: timed step runner
 # -------------------------------------------------------------------
 
-def _run_step(step_name: str, func, *args, **kwargs) -> Any:
+def _run_step(step_name: str, func: Callable[..., Any], *args, **kwargs) -> Any:
     """Execute *func* with timing, logging, and error handling.
 
     Returns the function's result on success, or ``None`` on failure.
@@ -285,7 +286,11 @@ def run_pipeline(config: Dict[str, Any]) -> None:
 # Normalize helper (bundles several normalize calls)
 # -------------------------------------------------------------------
 
-def _normalize_step(counts_df, organism, normalize_mod) -> Dict[str, Any]:
+def _normalize_step(
+    counts_df: pd.DataFrame,
+    organism: str,
+    normalize_mod: types.ModuleType,
+) -> Dict[str, Any]:
     """Run standardization, filtering, and log2 transform."""
     standardized = normalize_mod.standardize_expression_matrix(
         counts_df, organism=organism
