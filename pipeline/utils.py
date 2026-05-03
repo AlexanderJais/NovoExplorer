@@ -305,8 +305,13 @@ def read_table_flexible(path) -> pd.DataFrame:
 
     Attempt order:
     1. Tab-separated CSV with UTF-8 encoding
-    2. Tab-separated CSV with Latin-1 encoding
-    3. Excel file (``pd.read_excel``)
+    2. Tab-separated CSV with GB18030 encoding (Chinese, used by Novogene)
+    3. Tab-separated CSV with Latin-1 encoding (byte-faithful fallback)
+    4. Excel file (``pd.read_excel``)
+
+    GB18030 is tried before Latin-1 because Latin-1 decodes any byte
+    sequence without raising and would silently mojibake Chinese text in
+    Novogene deliveries (column headers, sample names, gene descriptions).
 
     Comment lines starting with ``#`` are skipped for CSV reads.
 
@@ -326,23 +331,15 @@ def read_table_flexible(path) -> pd.DataFrame:
     """
     path = Path(path)
 
-    # Strategy 1: TSV, UTF-8
-    try:
-        df = pd.read_csv(path, sep="\t", encoding="utf-8", comment="#")
+    for encoding in ("utf-8", "gb18030", "latin-1"):
+        try:
+            df = pd.read_csv(path, sep="\t", encoding=encoding, comment="#")
+        except Exception:
+            continue
         if len(df.columns) >= 1 and not df.empty:
             return df
-    except Exception:
-        pass
 
-    # Strategy 2: TSV, Latin-1
-    try:
-        df = pd.read_csv(path, sep="\t", encoding="latin-1", comment="#")
-        if len(df.columns) >= 1 and not df.empty:
-            return df
-    except Exception:
-        pass
-
-    # Strategy 3: Excel
+    # Excel fallback (binary format; encoding-agnostic)
     try:
         with pd.ExcelFile(path) as xls:
             if len(xls.sheet_names) > 1:
@@ -356,7 +353,7 @@ def read_table_flexible(path) -> pd.DataFrame:
         pass
 
     raise ValueError(
-        f"Unable to read '{path}' as TSV (utf-8), TSV (latin-1), or Excel."
+        f"Unable to read '{path}' as TSV (utf-8, gb18030, latin-1) or Excel."
     )
 
 

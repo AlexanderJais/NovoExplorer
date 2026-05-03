@@ -181,6 +181,17 @@ class TestReadTableFlexible:
         df = read_table_flexible(p)
         assert len(df) == 1
 
+    def test_decodes_gb18030_chinese(self, tmp_path):
+        # Novogene deliveries from Chinese pipelines often ship GBK/GB18030
+        # encoded TSVs. Latin-1 would decode the bytes without raising but
+        # produce mojibake; ensure we recover the original characters.
+        p = tmp_path / "chinese.tsv"
+        content = "gene_id\t描述\nGENE1\t差异表达基因\n"
+        p.write_bytes(content.encode("gb18030"))
+        df = read_table_flexible(p)
+        assert "描述" in df.columns
+        assert df.iloc[0]["描述"] == "差异表达基因"
+
 
 # -----------------------------------------------------------------------
 # load_config
