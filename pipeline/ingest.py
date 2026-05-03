@@ -7,6 +7,7 @@ parses the data files within them into pandas DataFrames.
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
 from pathlib import Path
@@ -63,21 +64,32 @@ def _safe_is_dir(p: Path) -> bool:
         return False
 
 
+@functools.lru_cache(maxsize=None)
+def _glob_to_regex(pattern: str) -> "re.Pattern[str]":
+    """Translate an fnmatch-style glob pattern into a compiled regex.
+
+    Memoised because the same pattern set is reused across many
+    directories during a discovery walk; pre-compiling avoids the
+    repeated re.compile work that previously dominated the runtime
+    of _iglob_dirs / iglob_files on large deliveries.
+    """
+    return re.compile(
+        re.escape(pattern).replace(r"\*", ".*").replace(r"\?", "."),
+        re.IGNORECASE,
+    )
+
+
 def _iglob_dirs(base: Path, patterns: tuple[str, ...]) -> List[Path]:
     """Return directories under *base* whose names match any pattern (case-insensitive)."""
     found: list[Path] = []
     if not _safe_is_dir(base):
         return found
+    compiled = [_glob_to_regex(p) for p in patterns]
     for child in _safe_iterdir(base):
         if not _safe_is_dir(child):
             continue
         name_lower = child.name.lower()
-        for pat in patterns:
-            # fnmatch-style: translate glob pattern to regex
-            regex = re.compile(
-                re.escape(pat).replace(r"\*", ".*").replace(r"\?", "."),
-                re.IGNORECASE,
-            )
+        for regex in compiled:
             if regex.fullmatch(name_lower):
                 found.append(child)
                 break
@@ -92,6 +104,7 @@ def iglob_files(base: Path, patterns: tuple[str, ...]) -> List[Path]:
     found: list[Path] = []
     if not _safe_is_dir(base):
         return found
+    compiled = [_glob_to_regex(p) for p in patterns]
     for child in _safe_iterdir(base):
         try:
             if not child.is_file():
@@ -99,11 +112,7 @@ def iglob_files(base: Path, patterns: tuple[str, ...]) -> List[Path]:
         except OSError:
             continue
         name = child.name
-        for pat in patterns:
-            regex = re.compile(
-                re.escape(pat).replace(r"\*", ".*").replace(r"\?", "."),
-                re.IGNORECASE,
-            )
+        for regex in compiled:
             if regex.fullmatch(name):
                 found.append(child)
                 break
@@ -207,17 +216,30 @@ def discover_novogene_structure(data_dir: str | Path) -> Dict[str, Any]:
 
     logger.info("Discovering Novogene structure under %s", data_dir)
 
-    # Collect every file for the inventory
+    # Single recursive walk. We previously walked once for the file
+    # inventory, again to enumerate top-level subdirs, and a third time
+    # inside _find_sample_info_file - on a 50k-file delivery this added
+    # measurable startup latency. Fold all three passes into one walk.
     discovered_files: list[Path] = []
-    for root, _dirs, files in sorted_walk(data_dir):
-        for f in files:
-            discovered_files.append(Path(root) / f)
+    top_level_dirs: list[Path] = []
+    sample_info_file: Optional[Path] = None
+    _sample_info_names_lower = {n.lower() for n in _SAMPLE_INFO_NAMES}
 
-    # Top-level and one-level-deep search for standard folders
-    search_roots = [data_dir]
-    for child in _safe_iterdir(data_dir):
-        if _safe_is_dir(child):
-            search_roots.append(child)
+    for root, dirs, files in sorted_walk(data_dir):
+        root_path = Path(root)
+        if root_path == data_dir:
+            # Capture top-level subdirectories as extra search roots
+            # without making a separate iterdir call. ``dirs`` is sorted
+            # by sorted_walk and only includes immediate children.
+            top_level_dirs = [data_dir / d for d in dirs]
+        for f in files:
+            fpath = root_path / f
+            discovered_files.append(fpath)
+            if sample_info_file is None and f.lower() in _sample_info_names_lower:
+                sample_info_file = fpath
+
+    # Pattern-match against the (small) list of pre-collected search roots.
+    search_roots = [data_dir, *top_level_dirs]
 
     def _first_match(patterns: tuple[str, ...]) -> Optional[Path]:
         for sr in search_roots:
@@ -232,7 +254,7 @@ def discover_novogene_structure(data_dir: str | Path) -> Dict[str, Any]:
         "enrichment_dir": _first_match(_ENRICHMENT_PATTERNS),
         "qc_dir": _first_match(_QC_PATTERNS),
         "mapping_dir": _first_match(_MAPPING_PATTERNS),
-        "sample_info_file": _find_sample_info_file(data_dir),
+        "sample_info_file": sample_info_file,
         "discovered_files": discovered_files,
     }
 

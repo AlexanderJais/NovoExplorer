@@ -14,6 +14,11 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from pipeline.constants import (
+    DEFAULT_LOG2FC_THRESHOLD,
+    DEFAULT_PADJ_THRESHOLD,
+    PVALUE_FLOOR,
+)
 from pipeline.utils import setup_logger
 
 # gseapy is an optional heavyweight dependency -- fail gracefully at call time
@@ -86,7 +91,7 @@ def run_preranked_gsea(
         return None, pd.DataFrame()
 
     # Clamp pvalues to valid range [1e-300, 1.0]
-    df["pvalue"] = df["pvalue"].clip(lower=1e-300, upper=1.0)
+    df["pvalue"] = df["pvalue"].clip(lower=PVALUE_FLOOR, upper=1.0)
 
     df["rank_score"] = np.sign(df["log2fc"]) * -np.log10(df["pvalue"])
 
@@ -285,8 +290,8 @@ def run_enrichment_analysis(
     """
     databases = config.get("enrichment_databases", _DEFAULT_GENE_SET_DBS)
     organism = config.get("organism", "human")
-    padj_thresh = config.get("padj_threshold", 0.05)
-    log2fc_thresh = config.get("log2fc_threshold", 1.0)
+    padj_thresh = config.get("padj_threshold", DEFAULT_PADJ_THRESHOLD)
+    log2fc_thresh = config.get("log2fc_threshold", DEFAULT_LOG2FC_THRESHOLD)
 
     results: Dict[str, Dict[str, Dict[str, pd.DataFrame]]] = {}
 
@@ -366,7 +371,7 @@ def run_enrichment_analysis(
 
 def compute_signature_overlap(
     deg_results: Dict[str, pd.DataFrame],
-    padj_threshold: float = 0.05,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
 ) -> pd.DataFrame:
     """Compute Jaccard index of significant gene sets across comparisons.
 
@@ -434,7 +439,7 @@ def compute_signature_overlap(
 def find_core_signatures(
     enrichment_results: Dict[str, Dict[str, Dict[str, pd.DataFrame]]],
     min_comparisons: int = 2,
-    padj_threshold: float = 0.05,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
 ) -> pd.DataFrame:
     """Find gene sets that are significantly enriched in multiple comparisons.
 
@@ -502,7 +507,7 @@ def find_core_signatures(
 
 def find_unique_signatures(
     enrichment_results: Dict[str, Dict[str, Dict[str, pd.DataFrame]]],
-    padj_threshold: float = 0.05,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
 ) -> pd.DataFrame:
     """Find gene sets significant in exactly one comparison.
 
@@ -600,7 +605,7 @@ def run_signatures(
           enriched in exactly one comparison.
     """
     config = config or {}
-    padj_threshold = config.get("padj_threshold", 0.05)
+    padj_threshold = config.get("padj_threshold", DEFAULT_PADJ_THRESHOLD)
     min_comparisons = int(config.get("signature_min_comparisons", 2))
 
     logger.info("=== Starting signature analysis pipeline ===")

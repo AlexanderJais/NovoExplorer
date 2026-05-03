@@ -1736,9 +1736,12 @@ with tab_export:
                     if candidate not in used_sheet_names:
                         used_sheet_names.add(candidate)
                         return candidate
-                # Exhausted suffix range; add hash to guarantee uniqueness
+                # Exhausted suffix range; add a 4-hex-char hash for
+                # uniqueness. SHA-1 instead of MD5 - this is purely for
+                # disambiguating sheet names so collision strength
+                # doesn't matter, but using MD5 trips security scanners.
                 import hashlib
-                h = hashlib.md5(base.encode()).hexdigest()[:4]
+                h = hashlib.sha1(base.encode()).hexdigest()[:4]
                 fallback = f"{base[:26]}_{h}"
                 used_sheet_names.add(fallback)
                 return fallback

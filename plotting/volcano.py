@@ -153,11 +153,15 @@ def create_volcano_plotly(
 
     # Annotate top significant genes
     top_genes = _top_significant(df, category, top_n_labels)
-    for _, row in top_genes.iterrows():
+    for x, y, label in zip(
+        top_genes["log2fc"],
+        top_genes["neg_log10_padj"],
+        top_genes["gene_name"],
+    ):
         fig.add_annotation(
-            x=row["log2fc"],
-            y=row["neg_log10_padj"],
-            text=row["gene_name"],
+            x=x,
+            y=y,
+            text=label,
             showarrow=True,
             arrowhead=0,
             arrowwidth=0.5,
@@ -255,16 +259,14 @@ def create_volcano_matplotlib(
 
     # Label top significant genes with adjustText
     top_genes = _top_significant(df, category, top_n_labels)
-    texts = []
-    for _, row in top_genes.iterrows():
-        texts.append(
-            ax.text(
-                row["log2fc"],
-                row["neg_log10_padj"],
-                row["gene_name"],
-                fontsize=5,
-            )
+    texts = [
+        ax.text(x, y, label, fontsize=5)
+        for x, y, label in zip(
+            top_genes["log2fc"],
+            top_genes["neg_log10_padj"],
+            top_genes["gene_name"],
         )
+    ]
     if texts:
         adjust_text(texts, ax=ax, arrowprops=dict(arrowstyle="-", color="gray", lw=0.4))
 

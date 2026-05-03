@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from pipeline.constants import DEFAULT_LOG2FC_THRESHOLD, DEFAULT_PADJ_THRESHOLD
 from pipeline.utils import setup_logger, standardize_deg_columns
 
 # Conditional import for pyDESeq2 -- it may not be installed in every
@@ -39,8 +40,8 @@ logger = setup_logger(__name__)
 def classify_regulation(
     log2fc: float,
     padj: float,
-    log2fc_threshold: float = 1.0,
-    padj_threshold: float = 0.05,
+    log2fc_threshold: float = DEFAULT_LOG2FC_THRESHOLD,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
 ) -> str:
     """Classify a gene as up-regulated, down-regulated, or not significant.
 
@@ -72,8 +73,8 @@ def classify_regulation(
 def _vectorized_classify(
     log2fc: pd.Series,
     padj: pd.Series,
-    log2fc_threshold: float = 1.0,
-    padj_threshold: float = 0.05,
+    log2fc_threshold: float = DEFAULT_LOG2FC_THRESHOLD,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
 ) -> pd.Series:
     """Vectorized version of :func:`classify_regulation` for entire columns."""
     result = pd.Series("ns", index=log2fc.index)
@@ -90,8 +91,8 @@ def _vectorized_classify(
 
 def parse_novogene_deg(
     deg_results: Dict[str, pd.DataFrame],
-    log2fc_threshold: float = 1.0,
-    padj_threshold: float = 0.05,
+    log2fc_threshold: float = DEFAULT_LOG2FC_THRESHOLD,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
 ) -> Dict[str, pd.DataFrame]:
     """Validate and clean already-parsed Novogene DEG result DataFrames.
 
@@ -395,8 +396,8 @@ def run_pydeseq2(
 
 def get_significant_genes(
     deg_df: pd.DataFrame,
-    padj_threshold: float = 0.05,
-    log2fc_threshold: float = 1.0,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
+    log2fc_threshold: float = DEFAULT_LOG2FC_THRESHOLD,
 ) -> pd.DataFrame:
     """Filter a DEG table to only significant genes.
 
@@ -442,8 +443,8 @@ def get_significant_genes(
 
 def summarize_deg_results(
     deg_results: Dict[str, pd.DataFrame],
-    padj_threshold: float = 0.05,
-    log2fc_threshold: float = 1.0,
+    padj_threshold: float = DEFAULT_PADJ_THRESHOLD,
+    log2fc_threshold: float = DEFAULT_LOG2FC_THRESHOLD,
 ) -> pd.DataFrame:
     """Summarise DEG counts across all comparisons.
 

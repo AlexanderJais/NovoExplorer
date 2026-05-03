@@ -361,10 +361,16 @@ def read_table_flexible(path) -> pd.DataFrame:
 # 5. Config loader
 # ===================================================================
 
+from pipeline.constants import (
+    DEFAULT_LOG2FC_THRESHOLD,
+    DEFAULT_ORGANISM,
+    DEFAULT_PADJ_THRESHOLD,
+)
+
 _DEFAULT_CONFIG = {
-    "organism": "human",
-    "log2fc_threshold": 1.0,
-    "padj_threshold": 0.05,
+    "organism": DEFAULT_ORGANISM,
+    "log2fc_threshold": DEFAULT_LOG2FC_THRESHOLD,
+    "padj_threshold": DEFAULT_PADJ_THRESHOLD,
     "top_n_genes": 50,
     "enrichment_databases": ["GO_BP", "GO_MF", "GO_CC", "KEGG"],
     "output_dir": "results",

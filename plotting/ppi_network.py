@@ -39,11 +39,14 @@ def _build_graph(
     nx = _nx()
     G = nx.Graph()
     has_score = score_col in ppi_df.columns
-    for _, row in ppi_df.iterrows():
-        src = str(row[src_col])
-        tgt = str(row[tgt_col])
-        score = float(row[score_col]) if has_score else 0.5
-        G.add_edge(src, tgt, score=score)
+    sources = ppi_df[src_col].astype(str)
+    targets = ppi_df[tgt_col].astype(str)
+    if has_score:
+        scores = pd.to_numeric(ppi_df[score_col], errors="coerce").fillna(0.5)
+    else:
+        scores = [0.5] * len(ppi_df)
+    for src, tgt, score in zip(sources, targets, scores):
+        G.add_edge(src, tgt, score=float(score))
     return G
 
 
