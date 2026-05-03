@@ -11,6 +11,25 @@ from io import BytesIO
 import streamlit as st
 
 
+# Plotly's static image export (``fig.to_image``) goes through kaleido.
+# Probe once at module load so we can render disabled buttons with a
+# clear tooltip instead of letting users click a button that takes a
+# few seconds and then errors. We pin kaleido<1.0 in requirements.txt;
+# the 1.x rewrite has a different API.
+try:  # pragma: no cover - environment-dependent
+    import kaleido  # noqa: F401
+
+    _HAS_KALEIDO = True
+except ImportError:
+    _HAS_KALEIDO = False
+
+_KALEIDO_HELP = (
+    "Image export needs the kaleido package. Install it with:\n\n"
+    "    pip install 'kaleido<1.0'\n\n"
+    "Then restart the app."
+)
+
+
 def download_csv_button(df, filename, label="Download CSV", key=None):
     """Render a download button for a DataFrame as CSV.
 
@@ -72,6 +91,20 @@ def download_figure_buttons(fig, filename_base):
     col_png, col_svg = st.columns(2)
 
     if _is_plotly_figure(fig):
+        if not _HAS_KALEIDO:
+            with col_png:
+                st.button(
+                    "Download PNG", disabled=True,
+                    help=_KALEIDO_HELP,
+                    key=f"dl_png_{filename_base}_disabled",
+                )
+            with col_svg:
+                st.button(
+                    "Download SVG", disabled=True,
+                    help=_KALEIDO_HELP,
+                    key=f"dl_svg_{filename_base}_disabled",
+                )
+            return
         try:
             with col_png:
                 png_bytes = fig.to_image(format="png", scale=2, width=1200, height=800)
@@ -93,9 +126,12 @@ def download_figure_buttons(fig, filename_base):
                     key=f"dl_svg_{filename_base}",
                 )
         except (ValueError, ImportError):
+            # kaleido is installed but the export still failed (e.g.
+            # browser-binary issues). Surface that distinctly from the
+            # not-installed case handled above.
             st.warning(
-                "Image export requires the **kaleido** package. "
-                "Install it with: `pip install kaleido`"
+                "Image export failed. The **kaleido** package is installed "
+                "but couldn't render this figure. See the terminal for details."
             )
 
     elif _is_matplotlib_figure(fig):

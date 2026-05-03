@@ -399,6 +399,12 @@ def main() -> None:
 
     # Display table with "Add to basket" buttons
     if not table_df.empty:
+        if "regulation" in table_df.columns:
+            st.caption(
+                "**regulation** column: `up` = higher in test vs control, "
+                "`down` = lower in test vs control, `ns` = not significant "
+                "at the current thresholds."
+            )
         st.dataframe(
             table_df,
             width="stretch",

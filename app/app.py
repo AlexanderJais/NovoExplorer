@@ -192,11 +192,42 @@ def _init_session_state() -> None:
 # app/file_utils so the same helpers back novogene_explorer.py too.
 
 
-def _run_pipeline_in_app(config: dict) -> str | None:
+class _StatusStageHandler(logging.Handler):
+    """Logging handler that surfaces ``STEP: <name>`` records as status updates.
+
+    ``run_pipeline._run_step`` emits an ``INFO`` record of the form
+    ``"STEP: Ingest"`` at the start of each pipeline stage. We mirror
+    those into the Streamlit ``st.status`` so the user sees granular
+    progress instead of a single static "Running pipeline..." spinner
+    for the multi-minute lifetime of the run.
+    """
+
+    def __init__(self, status) -> None:
+        super().__init__(level=logging.INFO)
+        self._status = status
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return
+        if msg.startswith("STEP: "):
+            stage = msg.removeprefix("STEP: ").strip()
+            try:
+                self._status.update(label=f"Running pipeline — {stage}...")
+                self._status.write(f"**{stage}**")
+            except Exception:
+                # Streamlit context can occasionally be unavailable; never
+                # let a status-update failure crash the pipeline run.
+                pass
+
+
+def _run_pipeline_in_app(config: dict, status=None) -> str | None:
     """Run the analysis pipeline inside the Streamlit app.
 
     Returns the path to the HDF5 results file on success, or None on
-    failure.
+    failure. If *status* is a Streamlit ``st.status`` container, its
+    label is updated as each pipeline stage starts.
     """
     from run_pipeline import run_pipeline
 
@@ -214,11 +245,19 @@ def _run_pipeline_in_app(config: dict) -> str | None:
         output_dir_path = Path(config.get("data_dir", ".")) / output_dir_path
     results_path = str(output_dir_path / _DEFAULT_RESULTS_FILENAME)
 
+    handler: logging.Handler | None = None
+    if status is not None:
+        handler = _StatusStageHandler(status)
+        logging.getLogger().addHandler(handler)
+
     try:
         run_pipeline(config)
     except Exception as exc:
         st.error(f"Pipeline failed: **{type(exc).__name__}** -- {exc}")
         return None
+    finally:
+        if handler is not None:
+            logging.getLogger().removeHandler(handler)
 
     if Path(results_path).exists():
         return results_path
@@ -307,8 +346,11 @@ def _show_data_picker() -> None:
     # --- Nothing recognised ---
     if p.is_dir():
         st.error(
-            f"No results or Novogene data found in `{user_path}`. "
-            "Make sure the folder contains Differential/, Enrichment/, or Quantification/ subdirectories."
+            f"Couldn't find any Novogene data in `{user_path}`. "
+            "NovoExplorer looks for any one of these subfolders: "
+            "`Differential/`, `Enrichment/`, or `Quantification/`. "
+            "If your delivery is one level up or down, try the parent or "
+            "a child folder."
         )
     else:
         st.error(
@@ -335,6 +377,13 @@ def _show_pipeline_launcher(data_dir: Path) -> None:
             "Organism",
             options=["human", "mouse"],
             key="_launch_organism",
+            help=(
+                "Species your samples come from. Used to look up the right "
+                "gene-set databases (KEGG, GO, MSigDB, etc.) when running "
+                "enrichment analysis. Pick **mouse** if your samples are "
+                "mouse — otherwise GSEA / ORA results will reference the "
+                "wrong genes."
+            ),
         )
     with col_b:
         padj = st.number_input(
@@ -363,8 +412,7 @@ def _show_pipeline_launcher(data_dir: Path) -> None:
         }
 
         with st.status("Running analysis pipeline...", expanded=True) as status:
-            st.write("Ingesting Novogene data...")
-            results_path = _run_pipeline_in_app(config)
+            results_path = _run_pipeline_in_app(config, status=status)
 
             if results_path is not None:
                 status.update(label="Pipeline complete!", state="complete")

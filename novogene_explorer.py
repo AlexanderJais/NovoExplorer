@@ -676,7 +676,11 @@ with tab_comparison:
     st.header("Comparison Browser")
 
     if not deg:
-        st.warning("No DEG data loaded.")
+        st.warning(
+            f"No differential expression results found in `{data_dir}`. "
+            "NovoExplorer looked for a `Differential/` subfolder. If your delivery is "
+            "one level up or down, point the sidebar browser at the right folder."
+        )
     else:
         comp_names = sorted(deg.keys())
         selected_comp = st.selectbox("Select comparison", comp_names, key="comp_select")
@@ -786,7 +790,11 @@ with tab_enrichment:
     st.header("Enrichment Analysis")
 
     if not enrichment:
-        st.warning("No enrichment data loaded. Check that the Enrichment/ folder exists.")
+        st.warning(
+            f"No enrichment results found in `{data_dir}`. "
+            "NovoExplorer looked for an `Enrichment/` subfolder containing GO, KEGG, "
+            "Reactome, DisGeNET, or DO results."
+        )
     else:
         enrich_comps = sorted(enrichment.keys())
         selected_enrich_comp = st.selectbox(
@@ -993,9 +1001,17 @@ with tab_pathway:
     st.caption("Select an enriched term and see its member genes colored by log2FC.")
 
     if not enrichment:
-        st.warning("No enrichment data loaded.")
+        st.warning(
+            f"No enrichment results found in `{data_dir}`. "
+            "NovoExplorer looked for an `Enrichment/` subfolder containing GO, KEGG, "
+            "Reactome, DisGeNET, or DO results."
+        )
     elif not deg:
-        st.warning("No DEG data loaded.")
+        st.warning(
+            f"No differential expression results found in `{data_dir}`. "
+            "NovoExplorer looked for a `Differential/` subfolder. If your delivery is "
+            "one level up or down, point the sidebar browser at the right folder."
+        )
     else:
         pw_comp = st.selectbox("Select comparison", sorted(enrichment.keys()), key="pw_comp")
         pw_dbs = sorted(enrichment[pw_comp].keys())
@@ -1136,7 +1152,11 @@ with tab_ma:
     st.caption("Mean expression (baseMean) vs log2 fold change — highlights expression-dependent changes.")
 
     if not deg:
-        st.warning("No DEG data loaded.")
+        st.warning(
+            f"No differential expression results found in `{data_dir}`. "
+            "NovoExplorer looked for a `Differential/` subfolder. If your delivery is "
+            "one level up or down, point the sidebar browser at the right folder."
+        )
     else:
         ma_comp = st.selectbox("Select comparison", sorted(deg.keys()), key="ma_comp_select")
         ma_df = deg[ma_comp].copy()
@@ -1218,7 +1238,11 @@ with tab_venn:
     st.caption("Compare significant DEG overlap across comparisons.")
 
     if not deg:
-        st.warning("No DEG data loaded.")
+        st.warning(
+            f"No differential expression results found in `{data_dir}`. "
+            "NovoExplorer looked for a `Differential/` subfolder. If your delivery is "
+            "one level up or down, point the sidebar browser at the right folder."
+        )
     elif len(deg) < 2:
         st.info("Need at least 2 comparisons for overlap analysis.")
     else:
@@ -1333,7 +1357,11 @@ with tab_ranked:
     st.caption("All genes ranked by fold change or significance, with cumulative enrichment view.")
 
     if not deg:
-        st.warning("No DEG data loaded.")
+        st.warning(
+            f"No differential expression results found in `{data_dir}`. "
+            "NovoExplorer looked for a `Differential/` subfolder. If your delivery is "
+            "one level up or down, point the sidebar browser at the right folder."
+        )
     else:
         rank_comp = st.selectbox("Select comparison", sorted(deg.keys()), key="rank_comp_select")
         rank_df = deg[rank_comp].copy()
@@ -1415,7 +1443,11 @@ with tab_degsummary:
     st.caption("Side-by-side log2FC and padj for each gene across all comparisons.")
 
     if not deg:
-        st.warning("No DEG data loaded.")
+        st.warning(
+            f"No differential expression results found in `{data_dir}`. "
+            "NovoExplorer looked for a `Differential/` subfolder. If your delivery is "
+            "one level up or down, point the sidebar browser at the right folder."
+        )
     else:
         summary_padj = st.slider(
             "Adjusted p-value threshold (highlight significant)", 0.001, 0.5, 0.05, 0.005,
@@ -1509,7 +1541,11 @@ if tab_ppi is not None:
     st.caption("Explore protein–protein interaction networks from Novogene PPI analysis.")
 
     if not ppi:
-        st.warning("No PPI data loaded.")
+        st.warning(
+            f"No PPI (protein-protein interaction) results found in `{data_dir}`. "
+            "NovoExplorer looked under `Enrichment/PPI/`. PPI is optional and not always "
+            "part of a Novogene delivery."
+        )
     else:
         ppi_comp = st.selectbox("Select comparison", sorted(ppi.keys()), key="ppi_comp")
         ppi_df = ppi[ppi_comp]
@@ -1783,6 +1819,33 @@ with tab_export:
             help="Minimum absolute log2 fold-change for export. 1.0 = 2-fold change, 2.0 = 4-fold change. Set to 0 to ignore effect size.",
         )
         sig_only = st.checkbox("Export significant genes only", value=True, key="export_sig_only")
+
+        # Live preview of the row count the current thresholds will yield,
+        # so the user knows whether they're about to export 0 genes or
+        # 50,000 before clicking the Generate button.
+        if deg:
+            preview_total = 0
+            preview_breakdown: list[tuple[str, int]] = []
+            for _comp_name, _df in deg.items():
+                if sig_only and {"log2fc", "padj"}.issubset(set(_df.columns)):
+                    _kept = _df[
+                        (_df["padj"] <= export_padj)
+                        & (_df["log2fc"].abs() >= export_fc)
+                    ]
+                else:
+                    _kept = _df
+                preview_total += len(_kept)
+                preview_breakdown.append((_comp_name, len(_kept)))
+            if sig_only:
+                st.info(
+                    f"At current thresholds, **{preview_total:,} genes** across "
+                    f"**{len(preview_breakdown)} comparison(s)** will be exported."
+                )
+            else:
+                st.info(
+                    f"All genes will be exported: **{preview_total:,}** rows "
+                    f"across **{len(preview_breakdown)} comparison(s)**."
+                )
 
         st.divider()
 
