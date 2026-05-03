@@ -199,3 +199,28 @@ class TestLoadMissingFile:
     def test_load_results_missing(self, tmp_path):
         with pytest.raises(FileNotFoundError):
             load_results(tmp_path / "nonexistent.h5")
+
+
+class TestAtomicWrite:
+    def test_failed_save_does_not_clobber_existing(self, tmp_path, monkeypatch):
+        # First write a valid file we want to protect.
+        h5_path = tmp_path / "results.h5"
+        save_results(_make_results(), h5_path)
+        original_bytes = h5_path.read_bytes()
+
+        # Now arrange for a save to blow up partway through.
+        from pipeline import persistence
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("simulated mid-write failure")
+
+        monkeypatch.setattr(persistence, "_write_results", boom)
+
+        with pytest.raises(RuntimeError, match="simulated"):
+            save_results(_make_results(), h5_path)
+
+        # The previously-good file must be untouched, and no .tmp leftovers
+        # should be lingering in the directory.
+        assert h5_path.read_bytes() == original_bytes
+        leftovers = [p for p in tmp_path.iterdir() if p != h5_path]
+        assert leftovers == [], f"leftover temp files: {leftovers}"

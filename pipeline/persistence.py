@@ -19,6 +19,8 @@ Provides save/load functions for all pipeline outputs using pandas HDFStore
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -91,6 +93,12 @@ def _unsanitize_name(name: str) -> str:
 def save_results(results: Dict[str, Any], output_path: str | Path) -> None:
     """Save all pipeline results to an HDF5 file.
 
+    The write is atomic: data is staged in a sibling temp file and
+    ``os.replace``\\ d into ``output_path`` once both the HDFStore and
+    h5py attribute phases complete. Concurrent invocations against the
+    same ``output_path`` produce distinct temp files, so they cannot
+    corrupt each other's output -- the last writer to finish wins.
+
     Parameters
     ----------
     results : dict
@@ -106,6 +114,36 @@ def save_results(results: Dict[str, Any], output_path: str | Path) -> None:
 
     logger.info("Saving pipeline results to '%s'.", output_path)
 
+    # Stage to a unique temp file in the same directory so os.replace is
+    # cheap (same filesystem) and atomic. Include PID so concurrent
+    # save_results calls against the same destination don't collide.
+    fd, tmp_str = tempfile.mkstemp(
+        prefix=f".{output_path.name}.",
+        suffix=f".{os.getpid()}.tmp",
+        dir=str(output_path.parent),
+    )
+    # Close the descriptor; HDFStore wants to open the path itself, and
+    # we don't want an open fd holding the file across the replace.
+    os.close(fd)
+    tmp_path = Path(tmp_str)
+
+    try:
+        _write_results(results, tmp_path)
+        os.replace(tmp_path, output_path)
+    except Exception:
+        # Clean up the partial tmp file; ignore errors (e.g. tmp already
+        # vanished) since we're already in an exception path.
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        raise
+
+    logger.info("Results saved successfully to '%s'.", output_path)
+
+
+def _write_results(results: Dict[str, Any], output_path: Path) -> None:
+    """Internal: write *results* to *output_path* (assumed to be a fresh file)."""
     with pd.HDFStore(str(output_path), mode="w") as store:
         # ---- Expression matrices ----
         expression = results.get("expression") or {}
@@ -191,8 +229,6 @@ def save_results(results: Dict[str, Any], output_path: str | Path) -> None:
                         h5.attrs[attr_key] = attr_val
                 except TypeError:
                     h5.attrs[attr_key] = str(attr_val)
-
-    logger.info("Results saved successfully to '%s'.", output_path)
 
 
 # ---------------------------------------------------------------------------
@@ -381,6 +417,9 @@ def load_expression(
     except FileNotFoundError:
         logger.error("Results file not found: '%s'.", output_path)
         return None
+    except OSError as exc:
+        logger.error("Cannot read '%s': %s.", output_path, exc)
+        return None
     except KeyError:
         logger.warning("Key '%s' not found in '%s'.", key, output_path)
         return None
@@ -422,6 +461,9 @@ def load_deg(
 
     except FileNotFoundError:
         logger.error("Results file not found: '%s'.", output_path)
+        return None
+    except OSError as exc:
+        logger.error("Cannot read '%s': %s.", output_path, exc)
         return None
     except KeyError:
         return None
@@ -482,6 +524,9 @@ def load_enrichment(
     except FileNotFoundError:
         logger.error("Results file not found: '%s'.", output_path)
         return None
+    except OSError as exc:
+        logger.error("Cannot read '%s': %s.", output_path, exc)
+        return None
     except KeyError:
         return None
 
@@ -509,6 +554,9 @@ def load_similarity(output_path: str | Path) -> Optional[Dict[str, Any]]:
             return sim if any(v is not None for v in sim.values()) else None
     except FileNotFoundError:
         logger.error("Results file not found: '%s'.", output_path)
+        return None
+    except OSError as exc:
+        logger.error("Cannot read '%s': %s.", output_path, exc)
         return None
     except KeyError:
         return None
@@ -540,6 +588,9 @@ def load_qc(output_path: str | Path) -> Optional[Dict[str, Any]]:
     except FileNotFoundError:
         logger.error("Results file not found: '%s'.", output_path)
         return None
+    except OSError as exc:
+        logger.error("Cannot read '%s': %s.", output_path, exc)
+        return None
     except KeyError:
         return None
 
@@ -567,6 +618,9 @@ def load_signatures(output_path: str | Path) -> Optional[Dict[str, Any]]:
             return sigs if any(v is not None for v in sigs.values()) else None
     except FileNotFoundError:
         logger.error("Results file not found: '%s'.", output_path)
+        return None
+    except OSError as exc:
+        logger.error("Cannot read '%s': %s.", output_path, exc)
         return None
     except KeyError:
         return None

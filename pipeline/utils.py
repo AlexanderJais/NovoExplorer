@@ -404,7 +404,20 @@ def load_config(path) -> dict:
     """
     path = Path(path)
 
-    if not path.exists():
+    # ``.exists()`` can raise OSError on disconnected external disks /
+    # stale NFS handles / unreadable parent directories. Treat any of
+    # those as "config not accessible" with a clear message rather than
+    # letting a cryptic OSError bubble up.
+    try:
+        path_exists = path.exists()
+    except OSError as exc:
+        raise FileNotFoundError(
+            f"Cannot access configuration file '{path}': {exc}. "
+            "If the path is on an external drive, make sure the volume "
+            "is mounted and readable."
+        ) from exc
+
+    if not path_exists:
         raise FileNotFoundError(f"Configuration file not found: {path}")
 
     if yaml is None:
