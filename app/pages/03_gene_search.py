@@ -31,6 +31,7 @@ from plotting.theme import (  # noqa: E402
     DIVERGING_CMAP,
     apply_plotly_theme,
 )
+from app.cache_utils import file_mtime_ns  # noqa: E402
 from app.components.gene_basket import (  # noqa: E402
     init_basket,
     add_to_basket,
@@ -59,22 +60,22 @@ _get_data_path = get_data_path
 
 
 @st.cache_data(show_spinner="Loading results...")
-def _load_all_results(path: str) -> dict:
+def _load_all_results(path: str, _mtime: int) -> dict:
     return load_results(path)
 
 
 @st.cache_data(show_spinner="Loading expression matrix...")
-def _load_expression(path: str, matrix_type: str = "tpm") -> pd.DataFrame | None:
+def _load_expression(path: str, _mtime: int, matrix_type: str = "tpm") -> pd.DataFrame | None:
     return load_expression(path, matrix_type=matrix_type)
 
 
 @st.cache_data(show_spinner="Loading similarity data...")
-def _load_similarity(path: str) -> dict | None:
+def _load_similarity(path: str, _mtime: int) -> dict | None:
     return load_similarity(path)
 
 
 @st.cache_data(show_spinner="Loading DEG data...")
-def _load_deg(path: str) -> dict | None:
+def _load_deg(path: str, _mtime: int) -> dict | None:
     return load_deg(path)
 
 
@@ -217,10 +218,11 @@ def main() -> None:
         return
 
     # Load data
-    results = _load_all_results(data_path)
-    expression_df = _load_expression(data_path, "tpm")
-    similarity_data = _load_similarity(data_path)
-    deg_all = _load_deg(data_path)
+    mtime = file_mtime_ns(data_path)
+    results = _load_all_results(data_path, mtime)
+    expression_df = _load_expression(data_path, mtime, "tpm")
+    similarity_data = _load_similarity(data_path, mtime)
+    deg_all = _load_deg(data_path, mtime)
 
     metadata = results.get("metadata") or {}
     samples_meta = metadata.get("samples")

@@ -29,6 +29,7 @@ from pipeline.persistence import (  # noqa: E402
 )
 from plotting.volcano import create_volcano_plotly  # noqa: E402
 from plotting.ma_plot import create_ma_plot_plotly  # noqa: E402
+from app.cache_utils import file_mtime_ns  # noqa: E402
 from app.components.filters import (  # noqa: E402
     comparison_selector,
     threshold_sliders,
@@ -67,22 +68,22 @@ _get_data_path = get_data_path
 
 
 @st.cache_data(show_spinner="Loading results...")
-def _load_all_results(path: str) -> dict:
+def _load_all_results(path: str, _mtime: int) -> dict:
     return load_results(path)
 
 
 @st.cache_data(show_spinner="Loading expression matrix...")
-def _load_expression(path: str, matrix_type: str = "tpm") -> pd.DataFrame | None:
+def _load_expression(path: str, _mtime: int, matrix_type: str = "tpm") -> pd.DataFrame | None:
     return load_expression(path, matrix_type=matrix_type)
 
 
 @st.cache_data(show_spinner="Loading DEG data...")
-def _load_deg(path: str) -> dict | None:
+def _load_deg(path: str, _mtime: int) -> dict | None:
     return load_deg(path)
 
 
 @st.cache_data(show_spinner="Listing comparisons...")
-def _list_comparisons(path: str) -> list[str]:
+def _list_comparisons(path: str, _mtime: int) -> list[str]:
     return list_comparisons(path)
 
 
@@ -161,10 +162,11 @@ def main() -> None:
     if not check_data_path(data_path):
         return
 
-    # Load data
-    results = _load_all_results(data_path)
-    expression_df = _load_expression(data_path, "tpm")
-    deg_all = _load_deg(data_path)
+    # Load data (mtime keys cache invalidation when results.h5 changes)
+    mtime = file_mtime_ns(data_path)
+    results = _load_all_results(data_path, mtime)
+    expression_df = _load_expression(data_path, mtime, "tpm")
+    deg_all = _load_deg(data_path, mtime)
 
     metadata = results.get("metadata") or {}
     samples_meta = metadata.get("samples")
@@ -178,7 +180,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     with st.sidebar:
         st.header("Filters")
-        comparisons = _list_comparisons(data_path)
+        comparisons = _list_comparisons(data_path, mtime)
         if not comparisons:
             comparisons = sorted(deg_all.keys())
         selected_comparison = comparison_selector(comparisons, key="de_comparison")

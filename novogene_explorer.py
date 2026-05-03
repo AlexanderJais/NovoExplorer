@@ -89,6 +89,7 @@ from pipeline.utils import (
     standardize_deg_columns,
     standardize_enrichment_columns,
 )
+from app.cache_utils import file_mtime_ns
 try:
     from plotting.ppi_network import build_ppi_network, build_ego_network
     _HAS_NETWORKX = True
@@ -153,27 +154,27 @@ def _build_fc_map(deg_df: pd.DataFrame) -> dict[str, float]:
 
 
 @st.cache_data(show_spinner="Scanning folder structure…")
-def load_structure(data_dir: str) -> dict:
+def load_structure(data_dir: str, _mtime: int) -> dict:
     return discover_novogene_structure(data_dir)
 
 
 @st.cache_data(show_spinner="Parsing DEG results…")
-def load_deg(deg_dir: str | None) -> dict[str, pd.DataFrame]:
+def load_deg(deg_dir: str | None, _mtime: int) -> dict[str, pd.DataFrame]:
     return parse_deg_results(deg_dir)
 
 
 @st.cache_data(show_spinner="Parsing enrichment results…")
-def load_enrichment(enrichment_dir: str | None) -> dict[str, dict[str, pd.DataFrame]]:
+def load_enrichment(enrichment_dir: str | None, _mtime: int) -> dict[str, dict[str, pd.DataFrame]]:
     return parse_enrichment_results(enrichment_dir)
 
 
 @st.cache_data(show_spinner="Parsing PPI networks…")
-def load_ppi(enrichment_dir: str | None) -> dict[str, pd.DataFrame]:
+def load_ppi(enrichment_dir: str | None, _mtime: int) -> dict[str, pd.DataFrame]:
     return parse_ppi_results(enrichment_dir)
 
 
 @st.cache_data(show_spinner="Reading diff_stat.xls…")
-def load_diff_stat(deg_dir: str | None) -> pd.DataFrame | None:
+def load_diff_stat(deg_dir: str | None, _mtime: int) -> pd.DataFrame | None:
     """Try to find and read diff_stat.xls from the DEG directory tree."""
     if deg_dir is None:
         return None
@@ -192,7 +193,7 @@ def load_diff_stat(deg_dir: str | None) -> pd.DataFrame | None:
 
 
 @st.cache_data(show_spinner="Parsing sample info…")
-def load_sample_info(path: str | None) -> pd.DataFrame | None:
+def load_sample_info(path: str | None, _mtime: int) -> pd.DataFrame | None:
     return parse_sample_info(path)
 
 
@@ -391,13 +392,16 @@ if not data_dir or not _safe_is_dir(Path(data_dir)):
 
 st.sidebar.success(f"**Loaded:** {Path(data_dir).name}")
 
-# Load data
-structure = load_structure(data_dir)
-deg = load_deg(str(structure["deg_dir"]) if structure["deg_dir"] else None)
-enrichment = load_enrichment(str(structure["enrichment_dir"]) if structure["enrichment_dir"] else None)
-ppi = load_ppi(str(structure["enrichment_dir"]) if structure["enrichment_dir"] else None)
-diff_stat = load_diff_stat(str(structure["deg_dir"]) if structure["deg_dir"] else None)
-sample_info = load_sample_info(str(structure["sample_info_file"]) if structure["sample_info_file"] else None)
+# Load data; mtime keys cache invalidation when the delivery folder is regenerated
+structure = load_structure(data_dir, file_mtime_ns(data_dir))
+deg_dir = str(structure["deg_dir"]) if structure["deg_dir"] else None
+enrichment_dir = str(structure["enrichment_dir"]) if structure["enrichment_dir"] else None
+sample_info_file = str(structure["sample_info_file"]) if structure["sample_info_file"] else None
+deg = load_deg(deg_dir, file_mtime_ns(deg_dir))
+enrichment = load_enrichment(enrichment_dir, file_mtime_ns(enrichment_dir))
+ppi = load_ppi(enrichment_dir, file_mtime_ns(enrichment_dir))
+diff_stat = load_diff_stat(deg_dir, file_mtime_ns(deg_dir))
+sample_info = load_sample_info(sample_info_file, file_mtime_ns(sample_info_file))
 gene_names = _all_gene_names(deg)
 
 # Sidebar metadata

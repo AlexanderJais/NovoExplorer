@@ -36,6 +36,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from pipeline.utils import load_config  # noqa: E402
+from app.cache_utils import file_mtime_ns  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -98,9 +99,13 @@ def _parse_config_path() -> str | None:
 # ---------------------------------------------------------------------------
 
 @st.cache_data(show_spinner=False)
-def _load_project_config(config_path: str) -> dict:
-    """Load and cache the YAML configuration."""
+def _load_project_config_cached(config_path: str, _mtime: int) -> dict:
     return load_config(config_path)
+
+
+def _load_project_config(config_path: str) -> dict:
+    """Load and cache the YAML configuration, invalidating on file edit."""
+    return _load_project_config_cached(config_path, file_mtime_ns(config_path))
 
 
 def _resolve_results_path(folder: str) -> str | None:

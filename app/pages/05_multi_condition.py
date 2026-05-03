@@ -32,6 +32,7 @@ from plotting.theme import (
     VOLCANO_COLORS,
     apply_plotly_theme,
 )
+from app.cache_utils import file_mtime_ns
 from app.components.filters import threshold_sliders
 from app.components.download import download_csv_button
 from app.components.shared import get_data_path, check_data_path, fmt_count, render_empty_state
@@ -53,7 +54,7 @@ _get_data_path = get_data_path
 
 
 @st.cache_data(show_spinner="Loading DEG data...")
-def _load_deg(path: str) -> dict | None:
+def _load_deg(path: str, _mtime: int) -> dict | None:
     return load_deg(path)
 
 
@@ -428,7 +429,7 @@ def main() -> None:
     if not check_data_path(data_path):
         return
 
-    deg_all = _load_deg(data_path)
+    deg_all = _load_deg(data_path, file_mtime_ns(data_path))
 
     if not deg_all or len(deg_all) < 2:
         st.warning(

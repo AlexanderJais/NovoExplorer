@@ -30,6 +30,7 @@ from pipeline.persistence import (  # noqa: E402
 )
 from plotting.pca import create_pca_scatter, create_umap_scatter  # noqa: E402
 from plotting.heatmap import create_heatmap_plotly  # noqa: E402
+from app.cache_utils import file_mtime_ns  # noqa: E402
 from app.components.filters import threshold_sliders  # noqa: E402
 from app.components.download import download_figure_buttons  # noqa: E402
 from app.components.shared import (  # noqa: E402
@@ -83,22 +84,22 @@ _get_data_path = get_data_path
 
 
 @st.cache_data(show_spinner="Loading results...")
-def _load_all_results(path: str) -> dict:
+def _load_all_results(path: str, _mtime: int) -> dict:
     return load_results(path)
 
 
 @st.cache_data(show_spinner="Loading expression matrix...")
-def _load_expression(path: str, matrix_type: str = "tpm") -> pd.DataFrame | None:
+def _load_expression(path: str, _mtime: int, matrix_type: str = "tpm") -> pd.DataFrame | None:
     return load_expression(path, matrix_type=matrix_type)
 
 
 @st.cache_data(show_spinner="Loading QC data...")
-def _load_qc(path: str) -> dict | None:
+def _load_qc(path: str, _mtime: int) -> dict | None:
     return load_qc(path)
 
 
 @st.cache_data(show_spinner="Loading DEG data...")
-def _load_deg(path: str) -> dict | None:
+def _load_deg(path: str, _mtime: int) -> dict | None:
     return load_deg(path)
 
 
@@ -129,10 +130,11 @@ def main() -> None:
         return
 
     # Load data -- use granular loaders to avoid reading everything twice
-    results = _load_all_results(data_path)
-    expression_df = _load_expression(data_path, "tpm")
-    qc_data = _load_qc(data_path)
-    deg_all = _load_deg(data_path)
+    mtime = file_mtime_ns(data_path)
+    results = _load_all_results(data_path, mtime)
+    expression_df = _load_expression(data_path, mtime, "tpm")
+    qc_data = _load_qc(data_path, mtime)
+    deg_all = _load_deg(data_path, mtime)
     # Note: results is used only for metadata/embeddings; expression, QC, and
     # DEG data come from the granular cached loaders above.
 

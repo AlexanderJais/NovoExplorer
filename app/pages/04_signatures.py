@@ -25,6 +25,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from pipeline.persistence import load_enrichment, load_signatures
 from plotting.enrichment import create_enrichment_dotplot
 from plotting.theme import apply_plotly_theme, get_nature_colorscale
+from app.cache_utils import file_mtime_ns
 from app.components.download import download_csv_button, download_figure_buttons
 from app.components.shared import get_data_path, check_data_path, table_height, render_empty_state
 
@@ -54,12 +55,12 @@ _get_data_path = get_data_path
 
 
 @st.cache_data(show_spinner="Loading enrichment data...")
-def _load_enrichment(path: str) -> dict | None:
+def _load_enrichment(path: str, _mtime: int) -> dict | None:
     return load_enrichment(path)
 
 
 @st.cache_data(show_spinner="Loading signature data...")
-def _load_signatures(path: str) -> dict | None:
+def _load_signatures(path: str, _mtime: int) -> dict | None:
     return load_signatures(path)
 
 
@@ -332,8 +333,9 @@ def main() -> None:
     if not check_data_path(data_path):
         return
 
-    enrichment_data = _load_enrichment(data_path)
-    signatures_data = _load_signatures(data_path)
+    mtime = file_mtime_ns(data_path)
+    enrichment_data = _load_enrichment(data_path, mtime)
+    signatures_data = _load_signatures(data_path, mtime)
 
     if not enrichment_data:
         render_empty_state(
